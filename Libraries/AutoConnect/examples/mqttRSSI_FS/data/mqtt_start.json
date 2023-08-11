@@ -1,0 +1,88 @@
+{
+  "title": "MQTT Setting",
+  "uri": "/mqtt_start",
+  "menu": false,
+  "element": [
+    {
+      "name": "c1",
+      "type": "ACText",
+      "value": "<h4>MQTT publishing has started.</h4>",
+      "style": "text-align:center;color:#2f4f4f;padding:5px;"
+    },
+    {
+      "name": "c2",
+      "type": "ACText",
+      "value": "<h4>Parameters saved as:</h4>",
+      "style": "text-align:center;color:#2f4f4f;padding:5px;"
+    },
+    {
+      "name": "mqttserver",
+      "type": "ACText",
+      "format": "Server: %s",
+      "posterior": "br",
+      "global": true
+    },
+    {
+      "name": "apikey",
+      "type": "ACText",
+      "format": "User API Key: %s",
+      "posterior": "br",
+      "global": true
+    },
+    {
+      "name": "channelid",
+      "type": "ACText",
+      "format": "Channel ID: %s",
+      "posterior": "br",
+      "global": true
+    },
+    {
+      "name": "writekey",
+      "type": "ACText",
+      "format": "Write API Key: %s",
+      "posterior": "br",
+      "global": true
+    },
+    {
+      "name": "clientid",
+      "type": "ACText",
+      "format": "Client ID: %s",
+      "posterior": "br",
+      "global": true
+    },
+    {
+      "name": "username",
+      "type": "ACText",
+      "format": "Username: %s",
+      "posterior": "br",
+      "global": true
+    },
+    {
+      "name": "password",
+      "type": "ACText",
+      "format": "Password: %s",
+      "posterior": "br",
+      "global": true
+    },
+    {
+      "name": "hostname",
+      "type": "ACText",
+      "format": "ESP host: %s",
+      "posterior": "br",
+      "global": true
+    },
+    {
+      "name": "period",
+      "type": "ACText",
+      "format": "Update period: %s",
+      "posterior": "br",
+      "global": true
+    },
+    {
+      "name": "clear",
+      "type": "ACSubmit",
+      "value": "Clear channel",
+      "uri": "/mqtt_clear"
+    }
+  ]
+}
