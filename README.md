@@ -2,6 +2,13 @@
 
 This repository contains the instructions for building and deploying your very own BAT Bitcoin Lightning ATM.
 
+Support the project or buy one here: https://geyser.fund/project/thebatlightningatm 🦇
+
+Support me here: https://www.buymeacoffee.com/cutthepretence 🍺
+
+Join the support group here: https://t.me/BitcoinAutoTeller
+
+
 The B.A.T, short for Bitcoin Auto Teller, is based on the original [FOSSA](https://github.com/lnbits/fossa "FOSSA") by Ben Arc and directly integrates with LNBits as a funding wallet. It is a highly functional Bitcoin Lightning ATM designed for an efficient, reliable, and convenient digital transactions experience. It has many features, including thermal printer and Over-The-Air (OTA) update capability, a large screen and enhanced user customisation options. The B.A.T is designed to sit in between a hobbyists dream and commercial environment.
 
 ![](https://i.ibb.co/x314MPv/Photo-Room-20230810-234927.png)
@@ -10,19 +17,31 @@ The B.A.T, short for Bitcoin Auto Teller, is based on the original [FOSSA](https
 
 Before starting, please gather the following components that will be required for this project:
 
-12V DC adapter (Power Source) such as THIS
-12V/5V converter such as THIS
-12V TTL Thermal Printer (You also need the USB to serial cable for uploading the Logo) THIS
-NV10 USB+ Note acceptor THIS
-DG600F Coin acceptor THIS
-ZX7D00CE01 7-inch screen with integrated ESP32-S3 (You also need the tool for burning) - THIS
-Momentary 3.3v button (with a harness) such as THIS
-Power 12v button (with a harness) such as THIS
-5.5mm x 2.1mm Female Male DC Power Plug Adapter such as THIS
-5.1mm X 2.1mm female power connector such as THIS
-5.1 X 2.1mm Male to Female dual splitter such as THIS
-HW-307 Relay module or similar such as THIS
-Coin Acceptor LED Surround such as THIS
+12V DC adapter (Power Source) such as [THIS](https://www.ebay.co.uk/itm/225019408019?mkcid=16&mkevt=1&mkrid=711-127632-2357-0&ssspo=r9ua64hcr--&sssrc=2047675&ssuid=M7LGxC1yShC&var=523896245140&widget_ver=artemis&media=COPY "THIS")
+
+12V/5V converter such as [THIS](https://www.ebay.co.uk/itm/193727621572 "THIS")
+
+12V TTL Thermal Printer (You also need the USB to serial cable for uploading the Logo) [THIS](https://www.aliexpress.com/item/4001275848142.html?channel=twinner "THIS")
+
+NV10 USB+ Note acceptor [THIS](https://www.innovative-technology.com/products/products-main/127-nv10-usb "THIS")
+
+DG600F Coin acceptor [THIS](https://www.aliexpress.com/item/32951358676.html?channel=twinner "THIS")
+
+ZX7D00CE01 7-inch screen with integrated ESP32-S3 (You also need the tool for burning) - [THIS](https://www.aliexpress.com/item/1005005000593458.html?spm=a2g0o.order_list.order_list_main.99.4f051802XMsYg2 "THIS")
+
+Momentary 3.3v button (with a harness) such as [THIS](https://www.ebay.co.uk/itm/255737525408 "THIS")
+
+Power 12v button (with a harness) such as [THIS](https://www.ebay.co.uk/itm/255737525408 "THIS")
+
+5.5mm x 2.1mm Female Male DC Power Plug Adapter such as [THIS](https://www.aliexpress.com/item/32990194795.html?channel=twinner "THIS")
+
+5.1mm X 2.1mm female power connector such as [THIS](https://www.aliexpress.com/item/1005003494724471.html?channel=twinner "THIS")
+
+5.1 X 2.1mm Male to Female dual splitter such as [THIS](https://www.aliexpress.com/item/4000552846445.html?channel=twinner "THIS")
+
+HW-307 Relay module or similar such as [THIS](https://www.ebay.co.uk/itm/225559844989?mkcid=16&mkevt=1&mkrid=711-127632-2357-0&ssspo=cZ33k8PfR2e&sssrc=2047675&ssuid=M7LGxC1yShC&widget_ver=artemis&media=COPY "THIS")
+
+Coin Acceptor LED Surround such as [THIS](https://www.aliexpress.com/item/1005002995360644.html?channel=twinner  "THIS")
 
 ### Programming the Thermal Printer:
 
