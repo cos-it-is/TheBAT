@@ -3,6 +3,15 @@
 This repository contains the instructions for building and deploying your very own B.A.T Bitcoin Lightning ATM.
 
 Support the project or buy one here: https://geyser.fund/project/thebatlightningatm or https://satsbat.com 🦇
+=======
+Support the project or buy one here: https://geyser.fund/project/thebatlightningatm 🦇
+
+Support me here: https://www.buymeacoffee.com/cutthepretence 🍺
+
+Join the support group here: https://t.me/BitcoinAutoTeller
+
+
+The B.A.T, short for Bitcoin Auto Teller directly integrates with LNBits as a funding wallet. It is a highly functional Bitcoin Lightning ATM designed for an efficient, reliable, and convenient digital transactions experience. It has many features, including thermal printer and Over-The-Air (OTA) update capability, a large screen and enhanced user customisation options. The B.A.T is designed to sit in between a hobbyists dream and commercial environment.
 
 Support me here: https://www.buymeacoffee.com/cutthepretence 🍺
 
@@ -24,11 +33,15 @@ The ATM also functions as a straight paper Gift voucher dispenser, adding a comp
 
 "The BAT" is a registered trademark. You are welcome to hack, fork, build, and use the source code and instructions found in this repository. However, the right to use the name "The BAT" or logo with any products or services is withheld and reserved for the trademark owner. Please be respectful and utilise your own logo/brand.
 
+The BAT is based on the [FOSSA](https://github.com/lnbits/fossa "FOSSA") by Ben Arc
 ### Components:
 
 Before starting, please gather the following components that will be required for this project:
 
 12V 3A DC adapter (Power Source) such as [THIS](https://www.ebay.co.uk/itm/225019408019?mkcid=16&mkevt=1&mkrid=711-127632-2357-0&ssspo=r9ua64hcr--&sssrc=2047675&ssuid=M7LGxC1yShC&var=523896245140&widget_ver=artemis&media=COPY "THIS")
+
+12V DC adapter (Power Source) such as [THIS](https://www.ebay.co.uk/itm/225019408019?mkcid=16&mkevt=1&mkrid=711-127632-2357-0&ssspo=r9ua64hcr--&sssrc=2047675&ssuid=M7LGxC1yShC&var=523896245140&widget_ver=artemis&media=COPY "THIS")
+
 
 12V/5V converter such as [THIS](https://www.ebay.co.uk/itm/193727621572 "THIS")
 
@@ -52,9 +65,13 @@ Power 12v button (with a harness) such as [THIS](https://www.ebay.co.uk/itm/2557
 
 HW-307 Relay module or similar such as [THIS](https://www.ebay.co.uk/itm/225559844989?mkcid=16&mkevt=1&mkrid=711-127632-2357-0&ssspo=cZ33k8PfR2e&sssrc=2047675&ssuid=M7LGxC1yShC&widget_ver=artemis&media=COPY "THIS")
 
+
 Coin Acceptor LED Surround such as [THIS](https://www.aliexpress.com/item/1005002995360644.html?channel=twinner "THIS")
 
 NV10 Host Cable - needed to change currency datasets or custom options on the acceptor [THIS](https://innovative-technology.com/shop/cables/nv9-nv10-usb-host-cable-detail "THIS") 
+
+
+Coin Acceptor LED Surround such as [THIS](https://www.aliexpress.com/item/1005002995360644.html?channel=twinner  "THIS")
 
 
 ### Programming the Thermal Printer:
@@ -194,8 +211,6 @@ Network and wallet configuration, You can change several parameters:
 
 ### Updating Firmware:
 - The B.A.T device allows firmware updates via OTA using .BIN files. To apply a new firmware update, navigate to the Update section in the access point, and proceed to flash the new release of the firmware.
-
-------------
 
 ![](https://i.ibb.co/bLwT21k/BULL.png)
 
