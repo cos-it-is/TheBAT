@@ -3,38 +3,35 @@
 This repository contains the instructions for building and deploying your very own B.A.T Bitcoin Lightning ATM.
 
 Support the project or buy one here: https://geyser.fund/project/thebatlightningatm or https://satsbat.com 🦇
-=======
-Support the project or buy one here: https://geyser.fund/project/thebatlightningatm 🦇
 
 Support me here: https://www.buymeacoffee.com/cutthepretence 🍺
 
 Join the support group here: https://t.me/BitcoinAutoTeller
 
-
-The B.A.T, short for Bitcoin Auto Teller directly integrates with LNBits as a funding wallet. It is a highly functional Bitcoin Lightning ATM designed for an efficient, reliable, and convenient digital transactions experience. It has many features, including thermal printer and Over-The-Air (OTA) update capability, a large screen and enhanced user customisation options. The B.A.T is designed to sit in between a hobbyists dream and commercial environment.
-
-Support me here: https://www.buymeacoffee.com/cutthepretence 🍺
-
-Join the support group here: https://t.me/BitcoinAutoTeller
+====
 
 ![](https://i.ibb.co/r4MHh2r/Photo-Room-20240103-000242.png)
 
-The B.A.T, short for Bitcoin Auto Teller, is based on the original [FOSSA](https://github.com/lnbits/fossa "FOSSA") by Ben Arc and directly integrates with LNBits as a funding wallet. 
+The B.A.T, short for Bitcoin Auto Teller directly integrates with https://lnbits.com as a funding wallet. 
 It is the first highly functional Bitcoin Lightning ATM to incorporate NFC withdrawls that support LNURL, LN Address and [Boltcard](https://www.boltcard.org/ "Boltcard"). It has many features, including thermal printer, NFC withdrawl, and Over-The-Air (OTA) update capability, a large screen and enhanced user customisation options. The B.A.T is designed to sit in between a hobbyists dream and commercial environment.
 It was born from a vision to creatly a very useable, small and portable ATM that can spark Bitcoin circular economies anywhere. 
 It can be taken to events, markets, shops, parties. All you need is a power supply (plug or battery) and a wifi connection (for some options such as NFC).
 It does however, work completely offline.
 The ATM also functions as a straight paper Gift voucher dispenser, adding a completely secondary and unique function.
 
+![](https://i.ibb.co/1q7Q0V6/Screenshot-2024-01-03-22-02-26-246-com-miui-gallery-1.png)
+
+## Trademark
+
+"The BAT" is a trademark. You are welcome to hack, fork, build, and use the source code and instructions found in this repository. However, the right to use the name "The BAT" or logo with any products or services is withheld and reserved for the trademark owner. Please be respectful and utilise your own logo/brand.
+
+The BAT is based on the [FOSSA](https://github.com/lnbits/fossa "FOSSA") by Ben Arc.
+
 ![](https://i.ibb.co/gzDjzWB/Photo-Room-20240103-220857.png)
 
+====
 
-### Trademark
-
-"The BAT" is a registered trademark. You are welcome to hack, fork, build, and use the source code and instructions found in this repository. However, the right to use the name "The BAT" or logo with any products or services is withheld and reserved for the trademark owner. Please be respectful and utilise your own logo/brand.
-
-The BAT is based on the [FOSSA](https://github.com/lnbits/fossa "FOSSA") by Ben Arc
-### Components:
+# Components:
 
 Before starting, please gather the following components that will be required for this project:
 
@@ -73,8 +70,9 @@ NV10 Host Cable - needed to change currency datasets or custom options on the ac
 
 Coin Acceptor LED Surround such as [THIS](https://www.aliexpress.com/item/1005002995360644.html?channel=twinner  "THIS")
 
+====
 
-### Programming the Thermal Printer:
+## Programming the Thermal Printer:
 
 Start by downloading the printer setting software available [THIS](https://www.hsprinter.com/?m=common&a=down&name=639a91a94e329.zip&g=e "THIS") .
 
@@ -91,7 +89,7 @@ Remember, it is crucial to use the precisely labeled "printer_logo.bmp" file and
 
 
 
-### Programming The DG600F Coin Acceptor:
+## Programming The DG600F Coin Acceptor:
 
 • Start by holding down the "A" button. Keep it pressed.
 
@@ -110,7 +108,7 @@ Remember, it is crucial to use the precisely labeled "printer_logo.bmp" file and
 There are instructions in the manual and many youtube videos of this process available.
 
 
-### Programming the NV10 USB+ Note Acceptor:
+## Programming the NV10 USB+ Note Acceptor:
 
 • Download the Validator Manager and Drivers suitable for your specific currency from the Innovative Technologies website (Create a free account).
 
@@ -131,7 +129,7 @@ There are instructions in the manual and many youtube videos of this process ava
 • Once all changes are completed, ensure to save and apply these new parameters.
 
 
-### Programming the 7-inch Screen with Integrated ESP32S3 using Arduino:
+## Programming the 7-inch Screen with Integrated ESP32S3 using Arduino:
 
 • Begin by launching your Arduino IDE.
 
@@ -146,23 +144,23 @@ There are instructions in the manual and many youtube videos of this process ava
 Alternatively, use a buring tool and the .BIN file provided in releases to install the firmware.
 
 
-### How to build:
+# How to build:
 • Connect the devices together as per the wiring diagram. You can use Dupont wires or for the board, you can use a 2x40 (40 pin) IDC connector to breakout the pins. This is a 2mm pitch (not common 2.54mm)
 
 # How to use:
 
-### Booting into Configuration Mode:
+## Booting into Configuration Mode:
 When you want to configure your B.A.T. device, you'll need to launch the access point. To do this, press the boot button on the burner cable during boot. The access point will have a name similar to "The B.A.T - {mac address}".
 
 Once you've connected to the access point, you can begin setting up the device.
 
 This can sometimes be an issue when using OTA updates. It is best (on android at least) I have found using edge browser to perform OTA updates.
 
-### Configuration Options:
+## Configuration Options:
 
 Network and wallet configuration, You can change several parameters:
 
-### General Options:
+## General Options:
 
 - Access point password: Choose a password to secure your device's access point. Detault is 'thebatatm'
 - LNURLDevice string: Set the connection string for funding. This can be from lnbits.com or self-hosted.
@@ -171,7 +169,7 @@ Network and wallet configuration, You can change several parameters:
 - API Key: Input your API Key, such as 69f5a4afe7834ddsj3jd7dj4f44cd82.
 
 
-### Acceptor and Fiat Settings:
+## Acceptor and Fiat Settings:
 
 - Enable or disable accepting notes or coins.
 - Set coin and bill values for the acceptors.
@@ -179,13 +177,13 @@ Network and wallet configuration, You can change several parameters:
 - Set a fee rate.
 - You can set a redemption period for each transaction when the thermal printer is in use.
 
-### Custom Options:
+## Custom Options:
 
 - Turn off/on the LED surround for the coin acceptor.
 - Enable/disable displaying the live rate. (Wifi connection required)
 - Set a balance check after each transaction. (Wifi connection required)
 
-### Withdrawl Settings:
+## Withdrawl Settings:
 - Set the output display options of the transaction QR codes – it could be the screen, print, or both.
 - You can decide to display Bitcoin quotes or jokes on each receipt – it would be selected randomly each time.
 - You can set a URL of your website or LNBits install URL (And other information you like) that prints on the receipt for promotional purposes.
@@ -195,21 +193,21 @@ Network and wallet configuration, You can change several parameters:
 - Withdrawl period timeout for transaction (with backup receipt printing if needed)
 
 
-### Network Time Protovol (NTP) Settings:
+## Network Time Protovol (NTP) Settings:
 
 - Configure your timezone, NTP server, and sync intervals for accurate timestamps on printed receipts. (Wifi connection required)
 - A time offset can be set for regions observing daylight saving.
 
-### Display Settings:
+## Display Settings:
 
 - Change screen brightness
 - Set the color mode of your display: default grafitti, stealth black and white, or set your custom color options.
 
-### Translation Settings:
+## Translation Settings:
 
 - Set the default and second language (with string translations) for your device. A button press when the ATM is in use will change the language.
 
-### Updating Firmware:
+## Updating Firmware:
 - The B.A.T device allows firmware updates via OTA using .BIN files. To apply a new firmware update, navigate to the Update section in the access point, and proceed to flash the new release of the firmware.
 
 ![](https://i.ibb.co/bLwT21k/BULL.png)
