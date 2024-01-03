@@ -9,6 +9,7 @@ typedef WebServer WiFiWebServer;
 #include <HardwareSerial.h>
 #include <ArduinoJson.h>
 #include <JC_Button.h>
+#include <cmath>
 #include <Hash.h>
 #include "qrcoded.h"
 #include "Bitcoin.h"
@@ -17,7 +18,14 @@ typedef WebServer WiFiWebServer;
 #include <Adafruit_Thermal.h>
 #include <stdlib.h>
 #include "time.h"
-#include "logo.h"
+#include "logo.h"  //logo images
+#include "Wire.h"
+#include <ctype.h>
+#include <WebSocketsClient.h>
+#include <Hash.h>
+#include "Adafruit_AW9523.h"
+#include <Adafruit_PN532_NTAG424.h>
+
 
 //========================================================//
 //===================HARDWARE SETTINGS====================//
@@ -26,41 +34,47 @@ typedef WebServer WiFiWebServer;
 //SETUP SCREEN - 7 INCH
 #define GRAFFITI 0xFFFF
 #define TFT_BL 45
+
 Arduino_ESP32RGBPanel* rgbpanel = new Arduino_ESP32RGBPanel(
   39 /* DE */, 38 /* VSYNC */, 5 /* HSYNC */, 9 /* PCLK */,
   10 /* R0 */, 11 /* R1 */, 12 /* R2 */, 13 /* R3 */, 14 /* R4 */,
   21 /* G0 */, 0 /* G1 */, 46 /* G2 */, 3 /* G3 */, 8 /* G4 */, 18 /* G5 */,
   17 /* B0 */, 16 /* B1 */, 15 /* B2 */, 7 /* B3 */, 6 /* B4 */,
-  0 /* hsync_polarity */, 20 /* hsync_front_porch */, 1 /* hsync_pulse_width */, 87 /* hsync_back_porch */,
-  0 /* vsync_polarity */, 5 /* vsync_front_porch */, 1 /* vsync_pulse_width */, 31 /* vsync_back_porch */,
+  0 /* hsync_polarity */, 0 /* hsync_front_porch */, 210 /* hsync_pulse_width */, 30 /* hsync_back_porch */,
+  0 /* vsync_polarity */, 0 /* vsync_front_porch */, 22 /* vsync_pulse_width */, 13 /* vsync_back_porch */,
   1 /* pclk_active_neg */, 16000000 /* prefer_speed */,
-  0 /* de_idle_high */, 0 /* pclk_idle_high */);
+  0 /* de_idle_high */, 0 /* pclk_idle_high */, true /* auto flush*/);
 
 Arduino_RGB_Display* gfx = new Arduino_RGB_Display(
-  800 /* width */, 480 /* height */, rgbpanel);
+  800 /* width */, 481 /* height */, rgbpanel, 2 /* rotation */);
 
 //FORMATTING
 bool format = false;  // true for formatting memory, use once, then make false and reflash
 
-//BUTTON SETTINGS--.
-#define buttonPin 40  //Set to GPIO for signal to button
-int debounce = 100;   //Set the debounce time (milliseconds) for the button, default should be 25, but may need modification if issues with sporadic presses are seen.
+//BUTTON SETTINGS
+#define buttonPin 40  //Set to GPIO for signal to button, only works on some GPIO. Don't change
+int debounce = 25;    //Set the debounce time (milliseconds) for the button, default should be 25, but may need modification if issues with sporadic presses are seen.
 #define apButton 0
 
-//BILL ACCEPTOR SETTINGS--
-#define RXB 4  //define the GPIO connected TO the TX of the bill acceptor
-#define TXB 1  //define the GPIO connected TO the RX of the bill acceptor
+//BILL ACCEPTOR SETTINGS
+#define RXB 2   //define the GPIO connected TO the TX of the bill acceptor
+#define TXB 20  //define the GPIO connected TO the RX of the bill acceptor
 
-//COIN ACCEPTOR SETTINGS--
-#define RXC 20          //define the GPIO connected TO the SIGNAL/TX of the coin acceptor
-#define INHIBITMECH 41  //define the GPIO connected TO the INHIBIT of the coin acceptor
+//COIN ACCEPTOR SETTINGS
+#define RXC 41         //define the GPIO connected TO the SIGNAL/TX of the coin acceptor
+#define INHIBITMECH 4  //define the GPIO connected TO the INHIBIT of the coin acceptor
 
-//THERMAL PRINTER SETTINGS--
+//THERMAL PRINTER SETTINGS
 #define RXP 42  //define the GPIO connected TO the TX of the thermal printer
 #define TXP 19  //define the GPIO connected TO the RX of the thermal printer
 
 //RELAY SETTINGS--
-#define RELAY_PIN 2
+#define RELAY_PIN 1
+
+//NFC PN532
+#define I2C_SDA 48
+#define I2C_SCL 47
+
 
 struct Quote {
   String text;
@@ -109,10 +123,10 @@ Joke jokes[] = {
 
 
 //GENERAL SETTINGS--
-String fwVersion = "1.0";  //set the version of the firmware release here.
-String hwVersion = "1.0";  //set the version of the hardware release here.
-#define IMAGE_WIDTH 280
-#define IMAGE_HEIGHT 280
+String fwVersion = "2,0";  //set the version of the firmware release here.
+String hwVersion = "2.0";  //set the version of the hardware release here.
+#define MAX_DATA_SIZE 854  // maximum allowed size of NFC data
+#define AW9523_ADDRESS 0x5B
 
 //========================================================//
 //========================================================//
@@ -123,25 +137,31 @@ String hwVersion = "1.0";  //set the version of the hardware release here.
 ////////OTHER VARIABLES AND DECLARATIONS///////
 ///////////////////////////////////////////////
 
-bool nativeLang, dualLang, stealthMode, ledOn, liveRate, useGraffiti, acceptCoins, acceptNotes, coinOnly, enableWifi, thermalQR, screenQR, printQuotes, printJokes, triggerAp = false, backupReceipt, balanceCheck;
+bool paymentVerified = false, paymentFailed = false, lowBalance = false, isBoltcard = false, nativeLang, dualLang, stealthMode, ledOn, liveRate, useGraffiti, acceptCoins, acceptNotes, coinOnly, enableWifi, enableNfc, atmMode, giftMode, thermalQR, screenQR, printQuotes, printJokes, triggerAp = false, backupReceipt, balanceCheck, wsDataReceived = false, pauseScanning = false;
 uint16_t colour1, colour2, colour3, colour4, colour5, background;
-String lannN = "", lauN = "", porN = "", resN = "", staN = "", wakN = "", entN = "", buyN = "", bitN = "", herN = "", insN = "", exiN = "", lanN = "", feeN = "", totN = "", scaN = "", indN = "", recN = "", scaQRN = "", valN = "", dayN = "", daysN = "", enjN = "", errN = "", errQRN = "", CountdownN = "", timerExpN = "", walletN = "";
+uint8_t metadataHash[32];
+String lannN = "", lauN = "", porN = "", resN = "", staN = "", wakN = "", entN = "", buyN = "", bitN = "", herN = "", insN = "", exiN = "", lanN = "", feeN = "", totN = "", scaN = "", indN = "", recN = "", scaQRN = "", valN = "", dayN = "", daysN = "", enjN = "", errN = "", errQRN = "", CountdownN = "", timerExpN = "", walletN = "", conN = "", nfcdN = "", nfc1N = "", nfc2N = "", nfc3N = "", nfc4N = "", nfc5N = "", procN = "", recwalN = "", giftvN = "", lnaN = "", maxaN = "", walbalN = "", paidN = "", emailN = "";
 String lannE = "English", porE = "Access Point Launched.", resE = "Restart and launch Access Point to Configure", buyE = "BUY", bitE = "BITCOIN", herE = "HERE", insE = "Insert cash to buy Bitcoin", exiE = "Press button to finish", feeE = "Fee", lanE = "Press button to change language", totE = "Total", scaE = "Scan to receive sats.", walletE = "Funding wallet is low, please top-up and restart.";
 String indE = "Inserted", recE = "Please take your receipt.", scaQRE = "Scan this QR code with a lightning wallet to receive your sats!", valE = "This is valid for", dayE = "day only", daysE = "days only", enjE = "Enjoy your Sats!", errE = "Error Printing: Check Printer", errQRE = "QR Code will shortly be displayed on the screen.", CountdownE = "Time Remaining", timerExpE = "Timer expired! Printing instead.";
-String lann, por, res, ver, buy, bit, her, ins, exi, lan, fee, tot, sca, ind, rec, scaQR, val, day, days, enj, err, errQR, Countdown, timerExp, wallet, qrData, ssid, apPassword = "thebatatm", wifiPassword, lnurlATM, baseURLATM, secretATM, currencyATM = "", ntpServer, invoice, rateapiEndpoint, walletapiEndpoint, apiKey, coinValues, billValues, tz, url;
+String conE = "Please contact operator via", emailE = "contact@youremail.com", nfc1E = "NFC Disabled", nfc2E = "Press button to scan QR instead", nfc3E = "Failed, Please retry or scan QR.", nfc4E = "Please scan QR instead.", nfc5E = "Or tap NFC below.", procE = "Processing. Please Wait.", recwalE = "Recommended wallet", giftvE = "Gift Voucher", lnaE = "LNURL/LN Address or Bolt Card", maxaE = "Max Amount", paidE = "PAID", walbalE = "Wallet Balance";
+String lann, por, res, ver, buy, bit, her, ins, exi, lan, fee, tot, sca, ind, rec, scaQR, val, day, days, enj, err, errQR, Countdown, timerExp, wallet, con, email, nfc1, nfc2, nfc3, nfc4, nfc5, proc, recwal, giftv, lna, maxa, paid, walbal, qrData, ssid, apPassword = "thebatatm", wifiPassword, lnurlATM, baseURLATM, secretATM, currencyATM = "", ntpServer, invoice, walletServer, walletID, coinValues, billValues, tz, url, lnurlp, adminKey, decodeUrl, metadata, domain, callback, hashString;
+String laddrUrl = "", lnurl = "", nfcData = "", receivedData = "", recWallet = "";
 int maxAmount, charge, bills, moneyTimer, converted, redemptionPd, timer = 0, screenW = 800, screenH = 480, maxReceipts;
 float coins, total;
-int billAmountInt[6] = { 5, 10, 20, 50, 100, 500 };
-float coinAmountFloat[6] = { 0.05, 0.1, 0.2, 0.5, 1, 2 };
+int billAmountInt[6];
+float coinAmountFloat[6];
 float coinAmountSize = sizeof(coinAmountFloat) / sizeof(float);
 int billAmountSize = sizeof(billAmountInt) / sizeof(int);
-double exchangeRateBTC = -1, exchangeRateSAT = -1, exchangeRateCUR = -1;
+int brightness = 200;
+double exchangeRateSAT = -1, exchangeRateCUR = -1;
 long gmtOffset_sec = 0;
 struct tm timeinfo;
+char lnurlData[MAX_DATA_SIZE], laddrData[MAX_DATA_SIZE];
+unsigned long maxAmountInSats, balanceInSats;
+
 // Store the last NTP time in a timestamp
 time_t lastSyncNtpTime = 0;
-// Variable to store the time of last sync in milliseconds & Interval to check and sync time (12 hours in milliseconds)
-unsigned long lastSyncTimeSec = 0, syncInterval, timerDuration, getRateInterval;  // Timer duration in seconds;
+unsigned long lastSyncTimeSec = 0, syncInterval, timerDuration, getRateInterval;
 
 
 fs::SPIFFSFS& FlashFS = SPIFFS;
@@ -230,25 +250,17 @@ static const char PAGE_ELEMENTS[] PROGMEM = R"(
         "style": "width:90%;display:block;color:#484f59"
       },
       {
-        "name": "rateapiendpoint",
+        "name": "walletid",
         "type": "ACInput",
-        "label": "API Endpoint for live prices ('Live Rate' and WiFi Required):",
+        "label": "Wallet ID from LNBits:",
         "apply": "text",
         "value": "",
         "style": "width:90%;display:block;color:#484f59"
       },
       {
-        "name": "walletapiendpoint",
+        "name": "adminkey",
         "type": "ACInput",
-        "label": "API Endpoint for your funding wallet ('Balance Check' and WiFi Required):",
-        "apply": "text",
-        "value": "",
-        "style": "width:90%;display:block;color:#484f59"
-      },
-      {
-        "name": "apikey",
-        "type": "ACInput",
-        "label": "API Key:",
+        "label": "Admin API Key from LNBits:",
         "apply": "text",
         "value": "",
         "style": "width:90%;display:block;color:#484f59"
@@ -375,7 +387,7 @@ static const char PAGE_ELEMENTS[] PROGMEM = R"(
         "type": "ACCheckbox",
         "label": "Balance Check",
         "style": "width:90%;display:block;color:#484f59;margin-bottom:15px;",
-        "checked": true
+        "checked": false
       },
       {
         "name": "newlinebal",
@@ -427,10 +439,55 @@ static const char PAGE_ELEMENTS[] PROGMEM = R"(
         "style": "width:90%;display:block;color:#484f59;margin-bottom:15px;",
         "checked": false
       },
+       {
+        "name": "screenmode",
+        "type": "ACText",
+        "value": "<h4>Screen Brightness</h4>",
+        "style": "font-family:'Arial',sans-serif;text-align:left;color:#163ff5;"
+      },
+      {
+        "name": "screenbmode",
+        "type": "ACElement",
+        "value": "<hr>"
+      },
+       {
+        "name": "screen",
+        "type": "ACRadio",
+        "value": [
+          "High",
+          "Medium",
+          "Low"
+        ],
+        "arrange": "vertical",
+        "style": "width:90%;display:block;color:#484f59;margin-bottom:15px;",
+        "checked": 1
+      },
+       {
+        "name": "headermode",
+        "type": "ACText",
+        "value": "<h4>Device Mode</h4>",
+        "style": "font-family:'Arial',sans-serif;text-align:left;color:#163ff5;"
+      },
+      {
+        "name": "newlinemode",
+        "type": "ACElement",
+        "value": "<hr>"
+      },
+      {
+        "name": "devicemode",
+        "type": "ACRadio",
+        "value": [
+          "ATM",
+          "Voucher Dispenser"
+        ],
+        "arrange": "vertical",
+        "style": "width:90%;display:block;color:#484f59;margin-bottom:15px;",
+        "checked": 1
+      },
       {
         "name": "headerqr",
         "type": "ACText",
-        "value": "<h4>QR Output</h4>",
+        "value": "<h4>ATM Withdrawl Method</h4>",
         "style": "font-family:'Arial',sans-serif;text-align:left;color:#163ff5;"
       },
       {
@@ -448,7 +505,14 @@ static const char PAGE_ELEMENTS[] PROGMEM = R"(
         ],
         "arrange": "vertical",
         "style": "width:90%;display:block;color:#484f59;margin-bottom:15px;",
-        "checked": 2
+        "checked": 1
+      },
+      {
+        "name": "enablenfc",
+        "type": "ACCheckbox",
+        "label": "Enable NFC",
+        "style": "width:90%;display:block;color:#484f59;margin-bottom:15px;",
+        "checked": true
       },
        {
         "name": "newlineqr2",
@@ -476,7 +540,24 @@ static const char PAGE_ELEMENTS[] PROGMEM = R"(
       {
         "name": "url",
         "type": "ACInput",
-        "label": "Your URL",
+        "label": "Your Website URL",
+        "apply": "text",
+        "value": "",
+        "style": "width:90%;display:block;color:#484f59"
+      },
+      {
+  "name": "email",
+  "type": "ACInput",
+  "label": "Your Support Email/Number",
+  "apply": "text",
+  "value": "",
+  "placeholder": "contact@youremail.com",
+  "style": "width:90%;display:block;color:#484f59"
+},
+      {
+        "name": "url1",
+        "type": "ACInput",
+        "label": "Recommended Wallet URL",
         "apply": "text",
         "value": "",
         "style": "width:90%;display:block;color:#484f59"
@@ -486,7 +567,7 @@ static const char PAGE_ELEMENTS[] PROGMEM = R"(
         "type": "ACInput",
         "label": "Maximum Receipts on Reel:",
         "apply": "number",
-        "value": "2",
+        "value": "75",
         "placeholder": "e.g. 50",
         "style": "width:90%;display:block;color:#484f59"
       },
@@ -910,6 +991,110 @@ static const char PAGE_LANGUAGE[] PROGMEM = R"(
           "placeholder": "Funding wallet is low, please top-up and restart.",
           "style": "width:90%;display:block;color:#484f59"
         },
+        {
+  "name": "con",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Please contact operator via",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "nfc1",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "NFC Disabled",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "nfc2",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Press button to scan QR instead",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "nfc3",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Failed, Please retry or scan QR.",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "nfc4",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Please scan QR instead.",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "nfc5",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Or tap NFC below.",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "proc",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Processing. Please Wait.",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "recwal",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Recommended wallet",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "giftv",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Gift Voucher",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "lna",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "LNURL or LN Address",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "maxa",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Max Amount",
+  "style" : "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "paid",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "PAID",
+  "style": "width:90%;display:block;color:#484f59"
+},
+{
+  "name": "walbal",
+  "type": "ACInput",
+  "apply": "text",
+  "value": "",
+  "placeholder": "Wallet Balance",
+  "style": "width:90%;display:block;color:#484f59"
+},
     {
       "name": "save2",
       "type": "ACSubmit",
@@ -970,21 +1155,30 @@ static const char PAGE_LANGUAGESAVE[] PROGMEM = R"(
 )";
 
 WiFiWebServer server;
+WebSocketsClient webSocket;
 AutoConnect portal(server);
 AutoConnectAux elementsAux;
 AutoConnectAux saveAux;
 AutoConnectAux languageAux;
 AutoConnectAux languagesaveAux;
 AutoConnectConfig config;
+Adafruit_AW9523 aw9523;
+HTTPClient http;
+
+
+
+
+
 /////////////////////////////////////////
 /////////////END ACCESS POINT////////////
 /////////////////////////////////////////
 
 
 Button BTNA(buttonPin, debounce, false, false);
-HardwareSerial SerialPort(0);        //Coin Acceptor
+HardwareSerial SerialPort(2);        //Coin Acceptor
 Adafruit_Thermal printer(&Serial1);  //Thermal Printer
-HardwareSerial SerialPort2(2);       //Note Acceptor
+HardwareSerial SerialPort2(0);       //Note Acceptor
+Adafruit_PN532 nfc(-1, -1, &Wire);   //NFC
 
 
 /////////////////////////////////////////
@@ -1063,6 +1257,42 @@ void logo() {
   }
 }
 
+void transactionVerified() {
+  gfx->fillScreen(BLACK);
+  drawRGB565Image(800 / 2 - IMAGE_WIDTH2 / 2, 480 / 2 - IMAGE_HEIGHT2 / 2, check_bmp, IMAGE_WIDTH2, IMAGE_HEIGHT2);
+  printText(paid.c_str(), u8g2_font_helvB18_te, 5, GREEN, false, -1, -1);
+  delay(4000);
+  gfx->fillScreen(background);
+}
+
+void balanceLow() {
+  gfx->fillScreen(WHITE);
+  printText((String(maxa.c_str()) + " " + "(Sats)" + ":" + String(maxAmountInSats)).c_str(), u8g2_font_helvB18_te, 1, BLACK, false, -1, 30);
+  printText((String(walbal.c_str()) + " " + "(Sats)" + ":" + String(balanceInSats)).c_str(), u8g2_font_helvB18_te, 1, BLACK, false, -1, 60);
+  printText(wallet.c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, -1);
+  delay(99999999);
+}
+
+void nfcLogo() {
+
+  // Calculate the starting point for the right half of the screen
+  int rightHalfStartX = gfx->width() / 2;
+
+  // Centering the image in the right half of the screen
+  int logoX = rightHalfStartX + (rightHalfStartX - IMAGE_WIDTH3) / 2;
+  int logoY = (gfx->height() - IMAGE_HEIGHT3) / 2;
+
+  // Draw NFC logo
+  drawRGB565Image(logoX, logoY, nfc_bmp, IMAGE_WIDTH3, IMAGE_HEIGHT3);
+  if (enableNfc) {
+    printText(nfc5.c_str(), u8g2_font_helvB18_te, 1, colour4, false, 410, 35);
+    printText(lna.c_str(), u8g2_font_helvB18_te, 1, colour4, false, 410, 470);
+  }
+}
+
+
+
+
 void setLang(const JsonObject& obj) {
   if (!nativeLang) {
     lann = lannE;
@@ -1089,6 +1319,20 @@ void setLang(const JsonObject& obj) {
     Countdown = CountdownE;
     timerExp = timerExpE;
     wallet = walletE;
+    con = conE;
+    email = emailE;
+    nfc1 = nfc1E;
+    nfc2 = nfc2E;
+    nfc3 = nfc3E;
+    nfc4 = nfc4E;
+    nfc5 = nfc5E;
+    proc = procE;
+    recwal = recwalE;
+    giftv = giftvE;
+    lna = lnaE;
+    maxa = maxaE;
+    paid = paidE;
+    walbal = walbalE;
   } else {
     lann = lannN;
     por = porN;
@@ -1114,21 +1358,34 @@ void setLang(const JsonObject& obj) {
     Countdown = CountdownN;
     timerExp = timerExpN;
     wallet = walletN;
+    con = conN;
+    email = emailN;
+    nfc1 = nfc1N;
+    nfc2 = nfc2N;
+    nfc3 = nfc3N;
+    nfc4 = nfc4N;
+    nfc5 = nfc5N;
+    proc = procN;
+    recwal = recwalN;
+    giftv = giftvN;
+    lna = lnaN;
+    maxa = maxaN;
+    paid = paidN;
+    walbal = walbalN;
   }
 }
 
 void getBalance() {
   // Initiate an HTTP client
-  HTTPClient http;
-  String url = walletapiEndpoint + "?api-key=" + apiKey;
+  String url = "https://" + walletServer + "/api/v1/wallet?api-key=" + adminKey;
   const char* urlChar = url.c_str();
 
   // Prepare the URL with the API endpoint
   http.begin(urlChar);
   http.setReuse(true);
   int httpResponseCode = http.GET();
-  unsigned long balanceInSats = 0;
-  unsigned long maxAmountInSats = maxAmount * exchangeRateSAT;  // Let's assume maxAmount and exchangeRateSAT are globally defined
+  balanceInSats = 0;
+  maxAmountInSats = maxAmount * exchangeRateSAT;
 
   // Give some time for the request to be completed
   delay(100);
@@ -1145,65 +1402,105 @@ void getBalance() {
     if (error) {
       gfx->fillScreen(WHITE);
       printText(wallet.c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, -1);
-      delay(99999999);  // adjust this delay as per your needs
+      delay(99999999);
     }
 
     // Extract the balance in sats
-    balanceInSats = doc["balance"].as<unsigned long>() / 1000;  // Adjust the factor as needed
+    balanceInSats = doc["balance"].as<unsigned long>() / 1000;
   }
 
   // Return whether the balance is more than the maxAmount
-  if (balanceInSats < maxAmountInSats) {
-    gfx->fillScreen(WHITE);
-    printText(wallet.c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, -1);
-    delay(99999999);  // adjust this delay as per your needs
+  if (balanceCheck && balanceInSats < maxAmountInSats) {
+    lowBalance = true;
+    balanceLow();
+  }
+}
+
+void checkWiFiConnection() {
+
+  if (enableWifi) {
+    if (WiFi.status() != WL_CONNECTED) {
+      WiFi.begin(ssid.c_str(), wifiPassword.c_str());
+    }
+    unsigned long startTime = millis();
+    // Wait for connection or timeout after 5 seconds
+    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
+      delay(100);
+    }
+  }
+}
+
+void getwsData() {
+
+
+  maxAmountInSats = maxAmount * exchangeRateSAT;
+  // Check if we have received WebSocket data
+  if (wsDataReceived) {
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, receivedData);
+
+    // Extract fields
+    balanceInSats = doc["wallet_balance"].as<unsigned long>();
+    JsonObject payment = doc["payment"];
+    const char* checking_id = payment["checking_id"];
+    const char* preimage = payment["preimage"];
+    bool pending = payment["pending"];
+    int fee = payment["fee"].as<int>();
+
+    // Check that all required fields are present
+    bool validJsonStructure = payment.containsKey("checking_id") && payment.containsKey("preimage") && payment.containsKey("pending") && payment.containsKey("fee");  // Ensure there are exactly 5 fields
+
+    if (validJsonStructure && !pending && checking_id[0] != '\0' && preimage[0] != '\0') {
+      paymentVerified = true;
+    }
+    // Return whether the balance is more than the maxAmount
+    if (balanceCheck && balanceInSats < maxAmountInSats) {
+      lowBalance = true;
+      balanceLow();
+    }
   }
 }
 
 
 unsigned long getRate() {
   // Make HTTP request to API to get exchange rate
-  HTTPClient http;
+  String rateapiEndpoint = "https://" + walletServer + "/lnurlp/api/v1/rate/" + String(currencyATM);
   http.begin(rateapiEndpoint);
   http.setReuse(true);
   int httpResponseCode = http.GET();
-  delay(100);
-  if (httpResponseCode == 200) {
+
+  if (httpResponseCode != 200) {
+    // Set rates to -1 to indicate an error
+    exchangeRateCUR = -1;
+    exchangeRateSAT = -1;
+    enableNfc = false;
+    http.end();
+    return 0;
+  }
+
+  if (httpResponseCode = 200) {
     String response = http.getString();
     http.end();
     DynamicJsonDocument ratedoc(1024);
     DeserializationError error = deserializeJson(ratedoc, response);
-    if (error) {
-      // Set rates to -1 to indicate an error
-      exchangeRateBTC = -1;
-      exchangeRateCUR = -1;
-      exchangeRateSAT = -1;
-      return 0;  // Return 0 to indicate an error
-    }
-    exchangeRateBTC = ratedoc["rate"].as<double>() / 100000000.0;
-    exchangeRateCUR = 1.0 / exchangeRateBTC;
-    exchangeRateSAT = exchangeRateBTC * 100000000.0;
-    // Round the exchange rate to the nearest integer and cast to unsigned long
+    exchangeRateSAT = ratedoc["rate"].as<double>();
+    exchangeRateCUR = (1.0 / exchangeRateSAT) * 100000000.0;
+    // // Round the exchange rate to the nearest integer and cast to unsigned long
     unsigned long rate = static_cast<unsigned long>(round(exchangeRateCUR));
-    gfx->fillRect(100, 0, 150, 60, background);
-    return rate;
-  } else {
+    enableNfc = true;
     http.end();
-    // Set rates to -1 to indicate an error
-    exchangeRateBTC = -1;
-    exchangeRateCUR = -1;
-    exchangeRateSAT = -1;
-    return 0;  // Return 0 to indicate an error
+    return rate;
   }
 }
 
 void getRateTimer() {
-  static unsigned long lastGetRateTime = 0;  // declare as static variable
+  static unsigned long lastGetRateTime = 0;
   unsigned long currentTime = millis();
-  if (currentTime - lastGetRateTime > (getRateInterval * 1000)) {  // Convert interval to seconds
+  if (currentTime - lastGetRateTime > (getRateInterval * 1000)) {
     lastGetRateTime = currentTime;
-    if (liveRate && enableWifi && !rateapiEndpoint.isEmpty() && !ssid.isEmpty() && !wifiPassword.isEmpty()) {
+    if (liveRate && enableWifi && !walletServer.isEmpty() && !ssid.isEmpty() && !wifiPassword.isEmpty()) {
       getRate();
+      gfx->fillRect(100, 0, 150, 60, background);
     }
   }
 }
@@ -1249,9 +1546,15 @@ void receiptCounter() {
             String name = obj["name"].as<String>();
 
             if (name == "qrmode") {
-              obj["checked"] = 1;  // Setting qrMode to 1
+              obj["checked"] = 1;
               screenQR = true;
               thermalQR = false;
+            }
+
+            if (name == "devicemode") {
+              obj["checked"] = 1;
+              atmMode = true;
+              giftMode = false;
             }
           }
         }
@@ -1272,21 +1575,24 @@ void receiptCounter() {
 bool checkForError() {
   // Transmit the real-time transmission status command for the specified status
   const byte transmitStatusCommand[] = { 0x10, 0x04, 0x01 };
+  const byte clearData[] = { 0x1B, 0x40 };  // clear data in buffer
   Serial1.write(transmitStatusCommand, sizeof(transmitStatusCommand));
 
-  delay(50);  // Adjust the delay as needed to allow time for the response
+  delay(50);
 
   if (Serial1.available()) {
     byte response = Serial1.read();
 
-    // Check if there is an error condition based on the response value
     if (response != 0x12) {
-      // Error condition detected
+
+      Serial1.write(clearData, sizeof(clearData));
       return true;
     }
   }
   return false;  // No error condition detected
 }
+
+
 
 String wrapText(String input, int lineLength) {
   String output = "";
@@ -1333,14 +1639,14 @@ void getDatetime() {
     // Sync the time
     if (WiFi.status() == WL_CONNECTED) {
       configTime(gmtOffset_sec, 0, ntpServer.c_str());
-      delay(500);  // Allow time for the sync to happen
+      delay(500);
       getLocalTime(&timeinfo);
 
       // Sync the time
       if (my_gmtOffset_sec != 0) {
         configTime(my_gmtOffset_sec, 0, ntpServer.c_str());
         my_gmtOffset_sec = 0;
-        delay(500);  // Allow time for the sync to happen
+        delay(500);
         getLocalTime(&timeinfo);
       }
 
@@ -1381,10 +1687,12 @@ void syncTimeNow() {
   lastSyncTimeSec = millis() / 1000;  // lastSyncTime is now in seconds
 }
 
-void printQRcode(String qrData) {
-  const byte modelCommand[] = { 0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x05 };  // Changed the module size to 6
-  const byte eccCommand[] = { 0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x33 };
+void printQRcode(String qrData, byte size = 6, bool isMainQR = true) {
+  // Adjust the size command based on whether it's the main or smaller QR
+  const byte modelCommand[] = { 0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, size };
+  const byte eccCommand[] = { 0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x33 };  // Error correction
   const byte printCommand[] = { 0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30 };
+
   Serial1.write(modelCommand, sizeof(modelCommand));
   Serial1.write(eccCommand, sizeof(eccCommand));
 
@@ -1395,6 +1703,7 @@ void printQRcode(String qrData) {
 
   Serial1.write(printCommand, sizeof(printCommand));
 }
+
 
 void printEncodedString(const String& str) {
   for (int i = 0; i < str.length(); i++) {
@@ -1415,7 +1724,6 @@ void printReceipt(String qrData) {
   int quoteIndex = random(20);  // re-randomize quoteIndex
 
   printLogo();
-  // Large centered text "Bitcoin Lighting ATM"
   printer.setSize('L');  // Set type size to large
   printer.justify('C');  // Center align text
   printer.feed(3);
@@ -1424,46 +1732,52 @@ void printReceipt(String qrData) {
   printer.println("Lightning ATM");
   printer.boldOff();
 
-  // Line space
   printer.feed(1);
-
-  // Medium text "Scan this QR code with a lightning wallet to receive your sats!"
   printer.setSize('S');
-  String scaQRText = scaQR;
-  scaQRText = wrapText(scaQRText, 25);
-  printEncodedString(scaQRText);  // Using encoded print
-
-  // Line space
-  printer.feed(1);
-
-  // Text "This is valid for X days only"
   printer.underlineOn();
+
   if (redemptionPd > 1) {
-    printEncodedString(val + " " + String(redemptionPd) + " " + days);  // Using encoded print
+    printEncodedString(val + " " + String(redemptionPd) + " " + days);
   } else if (redemptionPd = 1) {
-    printEncodedString(val + " " + String(redemptionPd) + " " + day);  // Using encoded print
+    printEncodedString(val + " " + String(redemptionPd) + " " + day);
   }
   printer.underlineOff();
-  // 2 Line spaces
+  // Line space
+  printer.feed(2);
+
+  String scaQRText = scaQR;
+  scaQRText = wrapText(scaQRText, 25);
+  printEncodedString(scaQRText);
+
+
+
   printer.feed(2);
   printQRcode(qrData);
   printer.feed(2);
 
-  // Large centered text "Enjoy your sats!"
   printer.setSize('M');
-  printEncodedString(enj);  // Using encoded print
-  printer.setSize('S');
+  printEncodedString(enj);
 
   if (!url.isEmpty()) {
     printer.feed(2);
     printer.println(url);
   }
+  printer.feed(1);
+  printer.setSize('S');
   if (enableWifi && !ssid.isEmpty() && !wifiPassword.isEmpty() && !ntpServer.isEmpty()) {
+
+    char buffer[80];  // Buffer to hold the formatted string
+
+    // Format the date and time into the buffer
+    strftime(buffer, sizeof(buffer), "%A, %B %d %Y %H:%M:%S", &timeinfo);
+
+    String dateTimeStr = String(buffer) + " " + tz;  // Convert to Arduino String and append timezone
+    String timeText = wrapText(dateTimeStr, 25);
     printer.feed(1);
-    printer.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-    printer.println(tz);
+    printer.println(timeText);  // Print the formatted date and time string
   }
 
+  printer.setSize('S');
   // Select a random quote or joke
   String text;
   if (printJokes) {
@@ -1482,9 +1796,96 @@ void printReceipt(String qrData) {
   // Few line feeds for easy ripping off
   printer.feed(2);
   const byte reset[] = { 0x1B, 0x40 };
-  Serial.write(reset, sizeof(reset));
+  Serial1.write(reset, sizeof(reset));
 }
 
+void printVoucher(String qrData, String recWallet) {
+
+  int jokeIndex = random(10);   // re-randomize jokeIndex
+  int quoteIndex = random(20);  // re-randomize quoteIndex
+
+  printLogo();
+  printer.setSize('L');
+  printer.justify('C');  // Center align text
+  printer.feed(3);
+  printer.boldOn();
+  printer.println("Bitcoin");
+  printer.println(giftv);
+  printer.boldOff();
+
+  // Line space
+  printer.feed(1);
+  printer.setSize('S');
+  printer.underlineOn();
+
+  if (redemptionPd > 1) {
+    printEncodedString(val + " " + String(redemptionPd) + " " + days);
+  } else if (redemptionPd = 1) {
+    printEncodedString(val + " " + String(redemptionPd) + " " + day);
+  }
+  printer.underlineOff();
+
+  // Line space
+  printer.feed(2);
+
+
+  String scaQRText = scaQR;
+  scaQRText = wrapText(scaQRText, 25);
+  printEncodedString(scaQRText);
+
+  // 2 Line spaces
+  printer.feed(2);
+  printQRcode(qrData);
+  printer.feed(2);
+  printEncodedString(recwal + ":");
+  printer.feed(2);
+  printQRcode(recWallet, 5, false);
+  printer.feed(2);
+  printer.setSize('M');
+  printEncodedString(enj);
+
+
+  if (!url.isEmpty()) {
+    printer.feed(2);
+    printer.println(url);
+  }
+  printer.feed(1);
+  printer.setSize('S');
+
+  if (enableWifi && !ssid.isEmpty() && !wifiPassword.isEmpty() && !ntpServer.isEmpty()) {
+
+    char buffer[80];  // Buffer to hold the formatted string
+
+    // Format the date and time into the buffer
+    strftime(buffer, sizeof(buffer), "%A, %B %d %Y %H:%M:%S", &timeinfo);
+
+    String dateTimeStr = String(buffer) + " " + tz;  // Convert to Arduino String and append timezone
+    String timeText = wrapText(dateTimeStr, 25);
+    printer.feed(1);
+    printer.println(timeText);
+  }
+
+  printer.setSize('S');
+  // Select a random quote or joke
+  String text;
+  if (printJokes) {
+    text = jokes[jokeIndex].text;
+  } else if (printQuotes) {
+    text = quotes[quoteIndex].text + "\n- " + quotes[quoteIndex].author;
+  }
+
+  // Print the quote or joke
+  text = wrapText(text, 32);  // Wrap the text to a line length of 32 characters
+  if (printJokes || printQuotes) {
+    printer.feed(2);
+    printer.println(text);
+  }
+
+  // Few line feeds for easy ripping off
+  printer.feed(2);
+  const byte reset[] = { 0x1B, 0x40 };
+  Serial1.write(reset, sizeof(reset));
+}
 
 /////////////////////////////////////////
 /////////////END PRINTER FUNCTIONS///////
@@ -1495,10 +1896,322 @@ void printReceipt(String qrData) {
 //////////////LOOP FUNCTIONS/////////////
 /////////////////////////////////////////
 
+String decode() {
+  decodeUrl = "https://" + walletServer + "/api/v1/payments/decode";
+  http.begin(decodeUrl);
+  http.addHeader("Content-Type", "application/json");
+  String postData = "{\"data\":\"" + nfcData + "\"}";
+
+  int httpResponseCode = http.POST(postData);
+
+  if (httpResponseCode != 200) {
+    paymentFailed = true;
+    http.end();
+    return "";  // Exit the function if response is not 200
+  }
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    // Create a JSON document
+    StaticJsonDocument<256> doc;
+
+    // Deserialize the JSON response
+    DeserializationError error = deserializeJson(doc, response);
+
+    if (!error) {
+      domain = doc["domain"].as<String>();
+    }
+  }
+
+
+
+  http.end();
+  return domain;
+}
+
+
+void getCallback(String& URL) {
+  http.begin(URL);
+
+  int httpResponseCode = http.GET();
+
+  if (httpResponseCode != 200) {
+    paymentFailed = true;
+    http.end();
+    return;  // Exit the function if response is not 200
+  }
+
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, response);
+
+    if (error) {
+      //add error condition here
+    } else {
+      // Extract metadata from JSON
+      metadata = doc["metadata"].as<String>();
+      callback = doc["callback"].as<String>();
+      // Calculate the SHA-256 hash of the metadata and store it in metadataHash
+      sha256(metadata, metadataHash);
+    }
+  }
+
+  http.end();
+}
+
+void boltPay(String& URL) {
+  http.begin(URL);
+
+  int httpResponseCode = http.GET();
+
+  if (httpResponseCode != 200) {
+    paymentFailed = true;
+    http.end();
+    return;  // Exit the function if response is not 200
+  }
+
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, response);
+
+    // Extract values from JSON
+    String tag = doc["tag"].as<String>();
+    String boltcallback = doc["callback"].as<String>();
+    String k1 = doc["k1"].as<String>();
+    int minWithdrawable = doc["minWithdrawable"].as<int>();
+    int maxWithdrawable = doc["maxWithdrawable"].as<int>();
+    String defaultDescription = doc["defaultDescription"].as<String>();
+    String payLink = doc["payLink"].as<String>();
+    // Find and extract callback url
+
+    int lnurlStartPos = defaultDescription.indexOf("lnurl://");
+    if (lnurlStartPos != -1) {
+      // Skip the "lnurl://" part
+      lnurlStartPos += String("lnurl://").length();
+
+      // Find the position of the closing bracket
+      int lnurlEndPos = defaultDescription.indexOf(')', lnurlStartPos);
+      if (lnurlEndPos != -1) {
+        // Extract the LNURL without "lnurl://" and the closing bracket - NEED TO get CB via LNURL because it provides metadata in API
+        String lnurlRefundAddress = defaultDescription.substring(lnurlStartPos, lnurlEndPos);
+        nfcData = lnurlRefundAddress;
+      }
+    }
+  }
+
+  http.end();
+}
+
+String uint8ArrayToHexString(const uint8_t* array, size_t size) {
+  String hexString = "";
+  for (size_t i = 0; i < size; ++i) {
+    char hexBuffer[3];
+    snprintf(hexBuffer, sizeof(hexBuffer), "%02X", array[i]);
+    hexString += hexBuffer;
+  }
+
+  return hexString;
+}
+
+
+void sendSats() {
+  webSocket.loop();
+  getRate();
+
+
+  // Check for error in exchange rate
+  if (exchangeRateCUR == -1) {
+    gfx->fillRect(410, 50, 400, 50, WHITE);
+    gfx->fillRect(410, 330, 400, 50, WHITE);
+    printText(nfc4.c_str(), u8g2_font_helvB18_te, 1, BLACK, false, 410, 360);
+    return;
+  }
+
+  double satoshis = (total / 100) * exchangeRateSAT;
+  satoshis = round(satoshis);                               // Round to the nearest whole number
+  long millisatoshis = static_cast<long>(satoshis) * 1000;  // Convert to millisatoshis
+
+  lnurlp = "https://" + String(walletServer) + "/api/v1/payments/lnurl";
+  http.begin(lnurlp);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Api-Key", adminKey);
+
+  hashString = uint8ArrayToHexString(metadataHash, sizeof(metadataHash));
+  hashString.toLowerCase();
+
+  String requestData = "{\"description_hash\":\"" + String(hashString) + "\",";
+  requestData += "\"callback\":\"" + String(callback) + "\",";
+  requestData += "\"amount\":" + String(millisatoshis) + ",";
+  //requestData += "\"amount\":1000,";  // - For testing 1 sat payments
+  requestData += "\"comment\":\"\",";
+  requestData += "\"description\":\"ATM Withdrawal\"}";
+
+  int httpResponseCode = http.POST(requestData);
+  // Check the HTTP response code
+  if (httpResponseCode != 200) {
+    paymentFailed = true;
+    http.end();
+    return;  // Exit the function if response is not 200
+  }
+  http.end();
+}
+
+
+
+
+void NFCPayment() {
+  webSocket.loop();
+  uint8_t success;
+  uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
+  uint8_t uidLength;
+  String laddrusername;
+  String laddrdomain;
+  String ntagdata;
+
+  if (pauseScanning) {
+    return;
+  }
+
+
+  success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 200);
+  if (success) {
+    if (((uidLength == 7) || (uidLength == 4)) && (nfc.ntag424_isNTAG424())) {
+      uint8_t data[256];
+      uint8_t bytesread = nfc.ntag424_ISOReadFile(data);
+
+      if (bytesread) {
+        // Dump the page data
+        data[bytesread] = 0;
+        ntagdata = (char*)data;
+        pauseScanning = true;
+        isBoltcard = true;
+        //return;
+      }
+    } else {
+      uint8_t data[16];
+      memset(data, 0, sizeof(data));
+
+      // Initialize lnurlData and addrData as empty strings
+      lnurlData[0] = '\0';
+      laddrData[0] = '\0';
+
+      for (uint8_t page = 4; page < 229; page++) {
+        success = nfc.mifareultralight_ReadPage(page, data);
+        if (success) {
+          // Concatenate the data from this page to both lnurlData and addrData
+          strncat(lnurlData, reinterpret_cast<char*>(data), sizeof(data));
+          strncat(laddrData, reinterpret_cast<char*>(data), sizeof(data));
+        } else {
+          break;
+        }
+      }
+      pauseScanning = true;
+      // Search for "en" within input data
+      char* enPrefixSearch = strstr(lnurlData, "en");
+      if (enPrefixSearch != nullptr) {
+        // Check if LNURL follows the "en" prefix
+        if (strncmp(enPrefixSearch, "enLNURL", 7) == 0) {
+          // Process LNURL Data
+          enPrefixSearch += 2;
+
+          int i = 0;
+          while (isalnum(enPrefixSearch[i])) {
+            i++;
+          }
+          enPrefixSearch[i] = '\0';
+          lnurl = String(enPrefixSearch);
+        } else {
+          // Assume the data is an laddr and process it accordingly
+          // Remove the "en" prefix
+          enPrefixSearch += 2;
+
+          // Find the '@' symbol within laddrSearch
+          char* atSymbol = strchr(enPrefixSearch, '@');
+          if (atSymbol != nullptr) {
+            // Find the first non-alphanumeric character after the '@' symbol
+            int i = 1;
+            while (isalnum(atSymbol[i]) || atSymbol[i] == '.') {
+              i++;
+            }
+            atSymbol[i] = '\0';
+
+            // Tokenize the input with '@' delimiter
+            char* token = strtok(enPrefixSearch, "@");
+            laddrusername = String(token);
+            token = strtok(NULL, "@");
+            laddrdomain = "";
+
+            if (token != NULL) {
+              laddrdomain = String(token);
+            }
+
+            // Format the LADDR data according to the desired format
+            laddrUrl = "https://" + laddrdomain + "/.well-known/lnurlp/" + laddrusername;
+          }
+        }
+      }
+    }
+    if (laddrUrl.isEmpty() && lnurl.isEmpty() && !isBoltcard) {
+      gfx->fillRect(410, 50, 400, 50, WHITE);
+      gfx->fillRect(410, 330, 400, 50, WHITE);
+      printText(nfc3.c_str(), u8g2_font_helvB18_te, 1, RED, false, 410, 360);
+      pauseScanning = false;
+    } else {
+      // Clear the area with a white rectangle
+      gfx->fillRect(410, 50, 400, 50, WHITE);
+      gfx->fillRect(410, 330, 400, 50, WHITE);
+      printText(proc.c_str(), u8g2_font_helvB18_te, 1, BLUE, false, 410, 80);
+      // Set the value of nfcData based on lnurl and laddr
+      if (isBoltcard) {
+        ntagdata.replace("lnurlw://", "https://");
+        boltPay(ntagdata);
+        decode();
+        getCallback(domain);
+        sendSats();
+      } else if (!laddrdomain.isEmpty() && !laddrusername.isEmpty() && !isBoltcard) {
+        nfcData = laddrUrl;
+        getCallback(laddrUrl);
+        sendSats();
+      } else if (!lnurl.isEmpty() && lnurl.length() >= 30 && !isBoltcard) {
+        nfcData = lnurl;
+        decode();
+        getCallback(domain);
+        sendSats();
+      } else {
+        // Clear the area with a white rectangle
+        gfx->fillRect(410, 50, 400, 50, WHITE);
+        gfx->fillRect(410, 330, 400, 50, WHITE);
+        printText(nfc3.c_str(), u8g2_font_helvB18_te, 1, RED, false, 410, 360);
+      }
+    }
+  }
+  if (paymentFailed) {
+    gfx->fillRect(410, 50, 400, 50, WHITE);
+    gfx->fillRect(410, 330, 400, 50, WHITE);
+    printText(nfc3.c_str(), u8g2_font_helvB18_te, 1, RED, false, 410, 360);
+    pauseScanning = false;
+    paymentFailed = false;
+  }
+  //pauseScanning = false;
+  nfcData = "";
+  domain = "";
+  callback = "";
+  metadata = "";
+  isBoltcard = false;
+}
+
 void feedmefiat() {
+  webSocket.loop();
+
   getRateTimer();
+
+  if (exchangeRateCUR == -1) {
+    enableNfc = false;
+  }
+
   if (stealthMode) {
-    //debounce = 10;
+
     printText(buy.c_str(), u8g2_font_maniac_tf, 4, WHITE, false, -1, 155);
     printText(bit.c_str(), u8g2_font_maniac_tf, 4, WHITE, false, -1, -1);
     printText(her.c_str(), u8g2_font_maniac_tf, 4, WHITE, false, -1, 415);
@@ -1559,6 +2272,7 @@ void feedmefiat() {
 }
 
 void qrShowCodeLNURL() {
+  bool showingQRcode = false;
   gfx->fillScreen(WHITE);
   qrData.toUpperCase();
   const char* qrDataChar = qrData.c_str();
@@ -1566,75 +2280,192 @@ void qrShowCodeLNURL() {
   uint8_t qrcodeData[qrcode_getBufferSize(20)];
   qrcode_initText(&qrcoded, qrcodeData, 11, 0, qrDataChar);
 
-  int qrSize = qrcoded.size * 6;  // Change the multiplier to 9 for a larger QR code
-  int offsetX = (screenW - qrSize) / 2;
-  int offsetY = (screenH - qrSize) / 2;
+  int qrSize = qrcoded.size * 6;  // Change the multiplier to adjust QR code size
+  int qrOffsetX, qrOffsetY;
 
-  for (uint8_t y = 0; y < qrcoded.size; y++) {
-    for (uint8_t x = 0; x < qrcoded.size; x++) {
-      if (qrcode_getModule(&qrcoded, x, y)) {
-        gfx->fillRect(offsetX + 6 * x, offsetY + 6 * y, 6, 6, BLACK);
-      } else {
-        gfx->fillRect(offsetX + 6 * x, offsetY + 6 * y, 6, 6, WHITE);
+  // QR code on the left side when NFC is enabled
+  int qrHalfWidth = qrSize / 2;
+  qrOffsetX = 200 - qrHalfWidth;  // Center the QR code in the left half
+  qrOffsetY = (screenH - qrSize) / 2;
+  gfx->fillRect(400, 40, 2, 400, BLACK);  // 2-pixel wide vertical bar
+  // Call function to display NFC logo and text on the right side
+  nfcLogo();
+  qrOffsetY = (screenH - qrSize) / 2;
+
+
+  if (!enableNfc) {
+    showingQRcode = true;
+  }
+  if (!enableNfc) {
+    // Draw QR code
+    for (uint8_t y = 0; y < qrcoded.size; y++) {
+      for (uint8_t x = 0; x < qrcoded.size; x++) {
+        if (qrcode_getModule(&qrcoded, x, y)) {
+          gfx->fillRect(qrOffsetX + 6 * x, qrOffsetY + 6 * y, 6, 6, BLACK);
+        } else {
+          gfx->fillRect(qrOffsetX + 6 * x, qrOffsetY + 6 * y, 6, 6, WHITE);
+        }
       }
     }
-  }
-  if (!screenQR && thermalQR) {
-    printText(rec.c_str(), u8g2_font_helvB18_te, 1, colour4, false, -1, 35);
-    printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
-  }
-  if (screenQR && !thermalQR) {
-    printText(sca.c_str(), u8g2_font_helvB18_te, 1, colour4, false, -1, 35);
-    printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
-  }
-  if (screenQR && thermalQR) {
-    printText((String(sca.c_str()) + " " + String(rec.c_str())).c_str(), u8g2_font_helvB18_te, 1, colour4, false, -1, 35);
-    printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
+    if (!screenQR && thermalQR) {
+      printText(rec.c_str(), u8g2_font_helvB18_te, 1, colour4, false, 10, 35);
+      printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
+    }
+    if (screenQR && !thermalQR && showingQRcode) {
+      printText(sca.c_str(), u8g2_font_helvB18_te, 1, colour4, false, 10, 35);
+      printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
+
+      printText(nfc1.c_str(), u8g2_font_helvB18_te, 2, RED, false, 450, 360);
+      printText("X", u8g2_font_helvB18_te, 5, RED, false, 550, 280);
+    }
+    if (screenQR && thermalQR && showingQRcode) {
+      printText((String(sca.c_str()) + " " + String(rec.c_str())).c_str(), u8g2_font_helvB18_te, 1, colour4, false, 10, 35);
+      printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
+      printText(nfc1.c_str(), u8g2_font_helvB18_te, 1, RED, false, 450, 360);
+      printText("X", u8g2_font_helvB18_te, 5, RED, false, 550, 280);
+    }
   }
 
   unsigned long startTime = millis();
   unsigned long elapsedTime = 0;
-  bool buttonPressed = false;  // Flag variable to track button press
+  bool QRButton = false;
+  bool exitButton = false;
+  unsigned long prevDisplayedTime = timerDuration + 1;
 
-  while (elapsedTime < timerDuration * 1000 && !buttonPressed) {
+  while (elapsedTime < timerDuration * 1000 && !exitButton && !paymentVerified) {
+    webSocket.loop();
+
+
+    if (enableNfc && !showingQRcode) {
+      NFCPayment();
+    }
+
+    if (paymentVerified) {
+      paymentVerified = false;
+      transactionVerified();
+      pauseScanning = false;
+      paymentFailed = false;
+      if (!lowBalance) {
+        return;
+      }
+    }
+
+
+    if (enableNfc && !showingQRcode) {
+      printText(nfc2.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 250);
+      if (BTNA.wasReleased() && !showingQRcode) {
+        if (!screenQR && thermalQR) {
+          printText(rec.c_str(), u8g2_font_helvB18_te, 1, colour4, false, 10, 35);
+          printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
+        }
+        if (screenQR && !thermalQR) {
+          gfx->fillRect(410, 0, 400, 50, WHITE);
+          gfx->fillRect(410, 330, 400, 50, WHITE);
+          gfx->fillRect(410, 440, 400, 50, WHITE);
+          printText(sca.c_str(), u8g2_font_helvB18_te, 1, colour4, false, 10, 35);
+          printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
+          printText(nfc1.c_str(), u8g2_font_helvB18_te, 2, RED, false, 450, 360);
+          printText("X", u8g2_font_helvB18_te, 5, RED, false, 550, 280);
+        }
+        if (screenQR && thermalQR) {
+          gfx->fillRect(410, 0, 400, 50, WHITE);
+          gfx->fillRect(410, 330, 400, 50, WHITE);
+          gfx->fillRect(410, 440, 400, 50, WHITE);
+          printText((String(sca.c_str()) + " " + String(rec.c_str())).c_str(), u8g2_font_helvB18_te, 1, colour4, false, 10, 35);
+          printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
+          printText(nfc1.c_str(), u8g2_font_helvB18_te, 2, RED, false, 450, 360);
+          printText("X", u8g2_font_helvB18_te, 5, RED, false, 550, 280);
+        }
+        // Draw QR code
+        gfx->fillRect(10, 220, 390, 50, WHITE);
+        for (uint8_t y = 0; y < qrcoded.size; y++) {
+          for (uint8_t x = 0; x < qrcoded.size; x++) {
+            if (qrcode_getModule(&qrcoded, x, y)) {
+              gfx->fillRect(qrOffsetX + 6 * x, qrOffsetY + 6 * y, 6, 6, BLACK);
+            } else {
+              gfx->fillRect(qrOffsetX + 6 * x, qrOffsetY + 6 * y, 6, 6, WHITE);
+            }
+          }
+        }
+        showingQRcode = true;
+      }
+    }
+
+
+
     BTNA.read();
-    if (BTNA.wasReleased()) {
-      buttonPressed = true;  // Set the flag when button is pressed
+    if (BTNA.wasReleased() && showingQRcode) {
+
+      showingQRcode = false;
+      exitButton = true;
+      paymentVerified = false;
+      pauseScanning = false;
+      return;
     }
 
     elapsedTime = millis() - startTime;                                  // Update the elapsed time
     unsigned long remainingTime = (timerDuration - elapsedTime / 1000);  // Calculate remaining time in seconds
-                                                                         /*
-    // Display the timer on the screen
-    gfx->setTextColor(RED);
-    gfx->setTextSize(1);
-    gfx->setCursor(500, 470);
-    gfx->printf("%s: %lu", Countdown.c_str(), remainingTime);
-    delay(125);  // Delay for a short period
-    gfx->fillRect(700, 450, 50, 60, WHITE);*/
 
-    gfx->setTextColor(RED);
-    gfx->setTextSize(1);
-    gfx->setCursor(450, 470);
-    gfx->printf("%s:", Countdown.c_str());
-    gfx->setCursor(700, 470);
-    gfx->printf("%lu", remainingTime);
-    delay(125);
-    gfx->fillRect(695, 450, 100, 100, WHITE);
+    // Update and display the countdown timer if the time has changed
+    if (remainingTime != prevDisplayedTime) {
+      prevDisplayedTime = remainingTime;
+
+      // Clear the area for the countdown timer
+      gfx->fillRect(670, 60, 100, 40, WHITE);
+      gfx->fillRect(410, 50, 400, 50, WHITE);
+      gfx->setTextColor(RED);
+      gfx->setTextSize(1);
+      gfx->setCursor(410, 80);
+      gfx->printf("%s:", Countdown.c_str());
+      gfx->setCursor(680, 80);
+      gfx->printf("%lu", remainingTime);
+    }
   }
 
-  if (elapsedTime >= timerDuration * 1000 && backupReceipt && !thermalQR && maxReceipts > 0) {
+
+
+
+  bool buttonPress = false;
+  if (elapsedTime >= timerDuration * 1000 && backupReceipt && !thermalQR && maxReceipts && !paymentVerified) {
+    checkForError();
+    bool isError = checkForError();
     gfx->fillScreen(WHITE);
-    printText(timerExp.c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, 80);
-    printText(rec.c_str(), u8g2_font_helvB18_te, 2, RED, false, -1, 200);
-    delay(3000);
-    printReceipt(qrData);  // Timer expired, call printReceipt()
-    delay(3000);
-    printText(exi.c_str(), u8g2_font_helvB18_te, 1, RED, false, 10, 470);
+
+    if (!isError) {
+      printText(timerExp.c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, 80);
+      printText(rec.c_str(), u8g2_font_helvB18_te, 2, RED, false, -1, -1);
+      delay(3000);
+      if (atmMode) {
+        printReceipt(qrData);
+      } else {
+        printVoucher(qrData, recWallet);
+      }
+      printText(exi.c_str(), u8g2_font_helvB18_te, 1, RED, false, 10, 470);
+    } else {
+      bool buttonPress = false;
+      while (!buttonPress) {
+        BTNA.read();
+        printText(err.c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, 80);
+        printText((String(con.c_str()) + " " + String(email.c_str())).c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, -1);
+        printText(exi.c_str(), u8g2_font_helvB18_te, 1, RED, false, 10, 470);
+        delay(500);
+        if (BTNA.wasPressed()) {
+          buttonPress = true;
+        }
+      }
+    }
+    paymentVerified = false;
+    pauseScanning = false;
+  }
+  if (lowBalance) {
+    lowBalance = false;
+    balanceLow();
+    return;
   }
 }
 
 void moneyTimerFun() {
+  webSocket.loop();
   bool waitForTap = true;
   bool langChange = true;
   coins = 0;
@@ -1644,9 +2475,13 @@ void moneyTimerFun() {
   unsigned long startTime = millis();  // store the start time
   while (waitForTap || total == 0) {
     if (total == 0) {
+      if (paymentVerified) {
+        paymentVerified = false;
+        pauseScanning = false;
+      }
       feedmefiat();
       BTNA.read();
-      if (dualLang && BTNA.wasReleased() && total == 0) {
+      if (dualLang && BTNA.wasPressed() && total == 0) {
         nativeLang = !nativeLang;
         setLang(obj);
         gfx->fillScreen(background);
@@ -1680,12 +2515,12 @@ void moneyTimerFun() {
       }
     }
     BTNA.read();
-    if (BTNA.wasReleased() && (total > 0 || total == maxAmount)) {
+    if (BTNA.wasPressed() && (total > 0 || total == maxAmount)) {
       waitForTap = false;
     }
   }
 
-  total = (coins + bills) * 100;
+  total = (coins + bills) * 1000;
 
   // Turn off machines
   SerialPort2.write(185);
@@ -1699,26 +2534,14 @@ void moneyTimerFun() {
 /////////////////////////////////////////
 /////////////////UTILITY/////////////////
 /////////////////////////////////////////
-void checkWiFiConnection() {
 
-  if (enableWifi) {
-    if (WiFi.status() != WL_CONNECTED) {
-      WiFi.begin(ssid.c_str(), wifiPassword.c_str());
-    }
-    unsigned long startTime = millis();
-    // Wait for connection or timeout after 5 seconds
-    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
-      delay(100);
-    }
-  }
-}
 
 void exitOTAStart() {
   digitalWrite(TFT_BL, LOW);
 }
 
 void exitOTAProgress(unsigned int amount, unsigned int sz) {
-  Serial.printf("OTA in progress: received %d bytes, total %d bytes\n", sz, amount);
+  //gfx->println("OTA in progress: received %d bytes, total %d bytes\n", sz, amount);
 }
 
 void exitOTAEnd() {
@@ -1734,9 +2557,17 @@ void exitOTAError(uint8_t err) {
 }
 
 String getValue(String data, char separator, int index) {
+  // Special handling for URLs to remove the protocol
+  if (separator == '/') {
+    int protocolEndIndex = data.indexOf("://");
+    if (protocolEndIndex != -1) {
+      data = data.substring(protocolEndIndex + 3);  // Skip past '://'
+    }
+  }
+
   int found = 0;
   int strIndex[] = { 0, -1 };
-  const int maxIndex = data.length() - 1;
+  int maxIndex = data.length() - 1;
 
   for (int i = 0; i <= maxIndex && found <= index; i++) {
     if (data.charAt(i) == separator || i == maxIndex) {
@@ -1749,6 +2580,8 @@ String getValue(String data, char separator, int index) {
   return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
+
+
 void to_upper(char* arr) {
   for (size_t i = 0; i < strlen(arr); i++) {
     if (arr[i] >= 'a' && arr[i] <= 'z') {
@@ -1756,6 +2589,30 @@ void to_upper(char* arr) {
     }
   }
 }
+
+
+
+void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
+  switch (type) {
+    case WStype_DISCONNECTED:
+      break;
+    case WStype_CONNECTED:
+      webSocket.sendTXT("Connected");  // send message to server when Connected
+      break;
+    case WStype_TEXT:
+      receivedData = (char*)payload;
+      receivedData.replace(String("'"), String('"'));  //known lnbits bug https://github.com/lnbits/lnbits/issues/1978
+      receivedData.toLowerCase();
+      wsDataReceived = true;
+      getwsData();
+      wsDataReceived = false;
+      break;
+    case WStype_ERROR:
+      break;
+  }
+}
+
+
 
 /////////////////////////////////////////
 //////////////END UTILITY////////////////
@@ -1823,12 +2680,10 @@ void makeLNURL() {
   }
 
   byte payload[51];  // 51 bytes is max one can get with xor-encryption
-
   size_t payload_len = xor_encrypt(payload, sizeof(payload), (uint8_t*)secretATM.c_str(), secretATM.length(), nonce, sizeof(nonce), randomPin, float(total));
   String preparedURL = baseURLATM + "?atm=1&p=";
   preparedURL += toBase64(payload, payload_len, BASE64_URLSAFE | BASE64_NOPADDING);
 
-  Serial.println(preparedURL);  // REMOVE FOR SECURITY??
   char Buf[200];
   preparedURL.toCharArray(Buf, 200);
   char* url = Buf;
@@ -1862,15 +2717,14 @@ void loadConfig() {
           apPassword = obj["value"].as<String>();
         } else if (name == "lnurl") {
           lnurlATM = obj["value"].as<String>();
+          walletServer = getValue(lnurlATM, '/', 0);
           baseURLATM = getValue(lnurlATM, ',', 0);
           secretATM = getValue(lnurlATM, ',', 1);
           currencyATM = getValue(lnurlATM, ',', 2);
-        } else if (name == "rateapiendpoint") {
-          rateapiEndpoint = obj["value"].as<String>();
-        } else if (name == "walletapiendpoint") {
-          walletapiEndpoint = obj["value"].as<String>();
-        } else if (name == "apikey") {
-          apiKey = obj["value"].as<String>();
+        } else if (name == "walletid") {
+          walletID = obj["value"].as<String>();
+        } else if (name == "adminkey") {
+          adminKey = obj["value"].as<String>();
         } else if (name == "coinmech") {
           coinValues = obj["value"].as<String>();
           if (!coinValues.isEmpty()) {
@@ -1916,6 +2770,24 @@ void loadConfig() {
           wifiPassword = obj["value"].as<String>();
         } else if (name == "enablewifi") {
           enableWifi = obj["checked"].as<bool>();
+        } else if (name == "screen") {
+          int screenSetting = obj["checked"].as<int>();
+          if (screenSetting == 1) {  // "High"
+            brightness = 220;
+          } else if (screenSetting == 2) {  // "Medium"
+            brightness = 120;
+          } else if (screenSetting == 3) {  // "Low"
+            brightness = 50;
+          }
+        } else if (name == "devicemode") {
+          int deviceMode = obj["checked"].as<int>();
+          if (deviceMode == 1) {  // "ATM"
+            atmMode = true;
+            giftMode = false;
+          } else if (deviceMode == 2) {  // "Gift"
+            atmMode = false;
+            giftMode = true;
+          }
         } else if (name == "qrmode") {
           int qrMode = obj["checked"].as<int>();
           if (qrMode == 1) {  // "Screen"
@@ -1928,6 +2800,8 @@ void loadConfig() {
             screenQR = true;
             thermalQR = true;
           }
+        } else if (name == "enablenfc") {
+          enableNfc = obj["checked"].as<bool>();
         } else if (name == "quotemode") {
           int quoteMode = obj["checked"].as<int>();
           if (quoteMode == 1) {  // "Quotes"
@@ -1944,6 +2818,8 @@ void loadConfig() {
           maxReceipts = obj["value"].as<int>();
         } else if (name == "url") {
           url = obj["value"].as<String>();
+        } else if (name == "url1") {
+          recWallet = obj["value"].as<String>();
         } else if (name == "ntp") {
           ntpServer = obj["value"].as<String>();
         } else if (name == "tz") {
@@ -2046,6 +2922,34 @@ void loadConfig() {
           CountdownN = obj["value"].as<String>();
         } else if (name == "timerexp") {
           timerExp = obj["value"].as<String>();
+        } else if (name == "con") {
+          con = obj["value"].as<String>();
+        } else if (name == "email") {
+          email = obj["value"].as<String>();
+        } else if (name == "nfc1") {
+          nfc1 = obj["value"].as<String>();
+        } else if (name == "nfc2") {
+          nfc2 = obj["value"].as<String>();
+        } else if (name == "nfc3") {
+          nfc3 = obj["value"].as<String>();
+        } else if (name == "nfc4") {
+          nfc4 = obj["value"].as<String>();
+        } else if (name == "nfc5") {
+          nfc5 = obj["value"].as<String>();
+        } else if (name == "proc") {
+          proc = obj["value"].as<String>();
+        } else if (name == "recwal") {
+          recwal = obj["value"].as<String>();
+        } else if (name == "giftv") {
+          giftv = obj["value"].as<String>();
+        } else if (name == "lna") {
+          lna = obj["value"].as<String>();
+        } else if (name == "maxa") {
+          maxa = obj["value"].as<String>();
+        } else if (name == "paid") {
+          paid = obj["value"].as<String>();
+        } else if (name == "walbal") {
+          walbal = obj["value"].as<String>();
         }
       }
     } else {
@@ -2063,19 +2967,19 @@ void loadConfig() {
 
 void setup() {
 
-  // Responder of root page handled directly from WebServer class.
-  // Setup screen and button
   gfx->begin();
   gfx->setFont(u8g2_font_helvB18_te);
   gfx->setUTF8Print(true);
   gfx->setCursor(30, 30);
+  randomSeed(analogRead(A0));  // for random jokes on receipt
   delay(100);
   pinMode(apButton, INPUT_PULLUP);
   pinMode(TFT_BL, OUTPUT);
   pinMode(RELAY_PIN, OUTPUT);
 
   BTNA.begin();
-  digitalWrite(TFT_BL, HIGH);
+  digitalWrite(TFT_BL, brightness);
+
   setLang(obj);
 
   gfx->setCursor(30, 30);
@@ -2119,7 +3023,7 @@ __AC_LINK__
   elementsAux.on([](AutoConnectAux& aux, PageArgument& arg) {
     File param = FlashFS.open(ELEMENTS_FILE, "r");
     if (param) {
-      aux.loadElement(param, { "appassword", "lnurl", "apikey", "rateapiendpoint", "walletapiendpoint", "balance", "ledon", "coinmech", "billmech", "maxamount", "charge", "liverate", "redemptionpd", "qrmode", "quotemode", "colourmode", "wifissid", "wifipassword", "enablewifi", "colour1", "colour2", "colour3", "colour4", "colour5", "background", "acceptcoins", "acceptnotes", "coinonly", "ntp", "offset", "tz", "sync", "url", "timer", "backup", "rateint", "maxreceipts" });
+      aux.loadElement(param, { "appassword", "lnurl", "walletid", "adminkey", "balance", "ledon", "coinmech", "billmech", "maxamount", "charge", "liverate", "redemptionpd", "qrmode", "devicemode", "quotemode", "colourmode", "wifissid", "wifipassword", "enablewifi", "colour1", "colour2", "colour3", "colour4", "colour5", "background", "acceptcoins", "acceptnotes", "coinonly", "ntp", "offset", "tz", "sync", "url", "email", "url1", "timer", "backup", "rateint", "maxreceipts", "enablenfc", "screen" });
       param.close();
     }
     return String();
@@ -2129,7 +3033,7 @@ __AC_LINK__
   saveAux.on([](AutoConnectAux& aux, PageArgument& arg) {
     File param = FlashFS.open(ELEMENTS_FILE, "w");
     if (param) {
-      elementsAux.saveElement(param, { "appassword", "lnurl", "apikey", "rateapiendpoint", "walletapiendpoint", "balance", "ledon", "coinmech", "billmech", "maxamount", "charge", "liverate", "redemptionpd", "qrmode", "quotemode", "colourmode", "wifissid", "wifipassword", "enablewifi", "colour1", "colour2", "colour3", "colour4", "colour5", "background", "acceptcoins", "acceptnotes", "coinonly", "ntp", "offset", "tz", "sync", "url", "timer", "backup", "rateint", "maxreceipts" });
+      elementsAux.saveElement(param, { "appassword", "lnurl", "walletid", "adminkey", "balance", "ledon", "coinmech", "billmech", "maxamount", "charge", "liverate", "redemptionpd", "qrmode", "devicemode", "quotemode", "colourmode", "wifissid", "wifipassword", "enablewifi", "colour1", "colour2", "colour3", "colour4", "colour5", "background", "acceptcoins", "acceptnotes", "coinonly", "ntp", "offset", "tz", "sync", "url", "email", "url1", "timer", "backup", "rateint", "maxreceipts", "enablenfc", "screen" });
       param.close();
     }
     return String();
@@ -2140,7 +3044,7 @@ __AC_LINK__
   languageAux.on([](AutoConnectAux& aux, PageArgument& arg) {
     File param = FlashFS.open(LANGUAGE_FILE, "r");
     if (param) {
-      aux.loadElement(param, { "nativelanguage", "duallanguage", "languagename", "portallaunched", "restartlaunch", "buy", "bitcoin", "buy", "bitcoin", "here", "insertfiat", "exit", "changelanguage", "fee", "total", "scan", "inserted", "receipt", "scanqr", "valid", "enjoy", "error", "errorqr", "countdown", "timerexp", "wallet", "day", "days" });
+      aux.loadElement(param, { "nativelanguage", "duallanguage", "languagename", "portallaunched", "restartlaunch", "buy", "bitcoin", "buy", "bitcoin", "here", "insertfiat", "exit", "changelanguage", "fee", "total", "scan", "inserted", "receipt", "scanqr", "valid", "enjoy", "error", "errorqr", "countdown", "timerexp", "wallet", "day", "days", "con", "nfc1", "nfc2", "nfc3", "nfc4", "nfc5", "proc", "recwal", "giftv", "lna", "maxa", "paid", "walbal" });
       param.close();
     }
     return String();
@@ -2150,7 +3054,7 @@ __AC_LINK__
   languagesaveAux.on([](AutoConnectAux& aux, PageArgument& arg) {
     File param = FlashFS.open(LANGUAGE_FILE, "w");
     if (param) {
-      languageAux.saveElement(param, { "nativelanguage", "duallanguage", "languagename", "portallaunched", "restartlaunch", "buy", "bitcoin", "buy", "bitcoin", "here", "insertfiat", "exit", "changelanguage", "fee", "total", "scan", "inserted", "receipt", "scanqr", "valid", "enjoy", "error", "errorqr", "countdown", "timerexp", "wallet", "day", "days" });
+      languageAux.saveElement(param, { "nativelanguage", "duallanguage", "languagename", "portallaunched", "restartlaunch", "buy", "bitcoin", "buy", "bitcoin", "here", "insertfiat", "exit", "changelanguage", "fee", "total", "scan", "inserted", "receipt", "scanqr", "valid", "enjoy", "error", "errorqr", "countdown", "timerexp", "wallet", "day", "days", "con", "nfc1", "nfc2", "nfc3", "nfc4", "nfc5", "proc", "recwal", "giftv", "lna", "maxa", "paid", "walbal" });
       param.close();
     }
     return String();
@@ -2181,7 +3085,7 @@ __AC_LINK__
     }
     timer = 2000;
   }
-
+  analogWrite(TFT_BL, brightness);
   if (enableWifi) {
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), wifiPassword.c_str());
@@ -2198,15 +3102,23 @@ __AC_LINK__
       gfx->setTextColor(WHITE);
       gfx->setCursor(30, 30);
       gfx->println("Connecting to WiFi...");
-      delay(3000);
+      delay(2000);
     }
 
     if (WiFi.status() == WL_CONNECTED) {
       gfx->fillScreen(BLACK);
       gfx->setTextColor(WHITE);
       gfx->setCursor(30, 30);
+      // Initialize WebSocket client with SSL
       gfx->println("Connected to WiFi");
-      delay(2000);
+      delay(1000);
+      gfx->fillScreen(BLACK);
+      gfx->setTextColor(WHITE);
+      gfx->setCursor(30, 30);
+      webSocket.beginSSL(walletServer, 443, "/api/v1/ws/" + walletID);
+      webSocket.onEvent(webSocketEvent);
+      webSocket.setReconnectInterval(1000);
+      delay(1000);
     } else {
       gfx->println("Failed to connect to WiFi.");
       delay(5000);
@@ -2226,6 +3138,10 @@ __AC_LINK__
   SerialPort.begin(4800, SERIAL_8N1, RXC);
   Serial1.begin(19200, SERIAL_8N1, RXP, TXP);
   SerialPort2.begin(300, SERIAL_8N2, RXB, TXB);
+  if (enableNfc) {
+    Wire.begin(I2C_SDA, I2C_SCL, 40000);
+    nfc.begin();
+  }
   setLang(obj);
   //check edition
   if (coinOnly) {
@@ -2238,28 +3154,31 @@ __AC_LINK__
     screenQR = true;
   }
   logo();
-  delay(3000);
+  delay(1000);
   if (WiFi.status() == WL_CONNECTED && !ntpServer.isEmpty()) {
     syncTimeNow();
   }
   gfx->fillScreen(background);
-  randomSeed(analogRead(A0));  // for random jokes on receipt
 
-  if (liveRate && enableWifi && !rateapiEndpoint.isEmpty() && !ssid.isEmpty() && !wifiPassword.isEmpty()) {
+
+  if (liveRate && enableWifi && !walletServer.isEmpty() && !ssid.isEmpty() && !wifiPassword.isEmpty()) {
     gfx->fillScreen(BLACK);
     gfx->setTextColor(WHITE);
     gfx->setCursor(30, 30);
     gfx->println("Getting Bitcoin Rate...");
-    delay(2000);
     getRate();
   }
-  if (liveRate && enableWifi && !walletapiEndpoint.isEmpty() && !ssid.isEmpty() && !wifiPassword.isEmpty() && balanceCheck) {
+  if (liveRate && enableWifi && !walletServer.isEmpty() && !walletServer.isEmpty() && !walletID.isEmpty() && !ssid.isEmpty() && !wifiPassword.isEmpty() && balanceCheck) {
     gfx->fillScreen(BLACK);
     gfx->setTextColor(WHITE);
     gfx->setCursor(30, 30);
     gfx->println("Checking Wallet Balance...");
-    delay(2000);
     getBalance();
+  }
+
+  if (giftMode) {
+    thermalQR = true;
+    screenQR = false;
   }
 
   // Turn on setup machines
@@ -2280,9 +3199,9 @@ __AC_LINK__
 /////////////////////////////////////////
 
 void loop() {
-  gfx->fillScreen(background);
 
-  // Accept FIAT
+  gfx->fillScreen(background);
+  webSocket.loop();
   moneyTimerFun();
   getDatetime();
   makeLNURL();
@@ -2293,9 +3212,6 @@ void loop() {
 
   if (screenQR && !thermalQR) {
     qrShowCodeLNURL();
-    if (enableWifi && !ssid.isEmpty() && !wifiPassword.isEmpty() && balanceCheck && !walletapiEndpoint.isEmpty()) {
-      getBalance();
-    }
   }
 
   if (thermalQR && !screenQR) {
@@ -2305,15 +3221,13 @@ void loop() {
       printText(errQR.c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, 200);
       delay(5000);
       qrShowCodeLNURL();
-      if (enableWifi && !ssid.isEmpty() && !wifiPassword.isEmpty() && balanceCheck && !walletapiEndpoint.isEmpty()) {
-        getBalance();
-      }
     } else {
       gfx->fillScreen(WHITE);
       printText(rec.c_str(), u8g2_font_helvB18_te, 2, colour4, false, -1, -1);
-      printReceipt(qrData);
-      if (enableWifi && !ssid.isEmpty() && !wifiPassword.isEmpty() && balanceCheck && !walletapiEndpoint.isEmpty()) {
-        getBalance();
+      if (atmMode) {
+        printReceipt(qrData);
+      } else {
+        printVoucher(qrData, recWallet);
       }
       delay(5000);
       receiptCounter();
@@ -2327,17 +3241,15 @@ void loop() {
       printText(errQR.c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, 200);
       delay(5000);
       qrShowCodeLNURL();
-      if (enableWifi && !ssid.isEmpty() && !wifiPassword.isEmpty() && balanceCheck && !walletapiEndpoint.isEmpty()) {
-        getBalance();
-      }
     } else {
-      printReceipt(qrData);
+      if (atmMode) {
+        printReceipt(qrData);
+      } else {
+        printVoucher(qrData, recWallet);
+      }
       delay(500);
       qrShowCodeLNURL();
       receiptCounter();
-      if (enableWifi && !ssid.isEmpty() && !wifiPassword.isEmpty() && balanceCheck && !walletapiEndpoint.isEmpty()) {
-        getBalance();
-      }
     }
   }
   // check machines
