@@ -39,7 +39,6 @@ Before starting, please gather the following components that will be required fo
 
 12V DC adapter (Power Source) such as [THIS](https://www.ebay.co.uk/itm/225019408019?mkcid=16&mkevt=1&mkrid=711-127632-2357-0&ssspo=r9ua64hcr--&sssrc=2047675&ssuid=M7LGxC1yShC&var=523896245140&widget_ver=artemis&media=COPY "THIS")
 
-
 12V/5V converter such as [THIS](https://www.ebay.co.uk/itm/193727621572 "THIS")
 
 12V TTL Thermal Printer (You also need the USB to serial cable for uploading the Logo) [THIS](https://www.aliexpress.com/item/4001275848142.html?channel=twinner "THIS")
@@ -62,13 +61,13 @@ Power 12v button (with a harness) such as [THIS](https://www.ebay.co.uk/itm/2557
 
 HW-307 Relay module or similar such as [THIS](https://www.ebay.co.uk/itm/225559844989?mkcid=16&mkevt=1&mkrid=711-127632-2357-0&ssspo=cZ33k8PfR2e&sssrc=2047675&ssuid=M7LGxC1yShC&widget_ver=artemis&media=COPY "THIS")
 
-
 Coin Acceptor LED Surround such as [THIS](https://www.aliexpress.com/item/1005002995360644.html?channel=twinner "THIS")
 
 NV10 Host Cable - needed to change currency datasets or custom options on the acceptor [THIS](https://innovative-technology.com/shop/cables/nv9-nv10-usb-host-cable-detail "THIS") 
 
-
 Coin Acceptor LED Surround such as [THIS](https://www.aliexpress.com/item/1005002995360644.html?channel=twinner  "THIS")
+
+PN532 NFC Board such as [THIS](https://www.amazon.co.uk/HiLetgo-PN532-Module-Communication-Android/dp/B01I1J17LC  "THIS")
 
 ====
 
