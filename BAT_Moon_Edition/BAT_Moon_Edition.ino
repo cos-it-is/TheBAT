@@ -52,24 +52,24 @@ Arduino_RGB_Display* gfx = new Arduino_RGB_Display(
 bool format = false;  // true for formatting memory, use once, then make false and reflash
 
 //BUTTON SETTINGS
-#define buttonPin 40  //Set to GPIO for signal to button, only works on some GPIO. Don't change
+#define buttonPin 2  //Set to GPIO for signal to button, only works on some GPIO. Don't change
 int debounce = 25;    //Set the debounce time (milliseconds) for the button, default should be 25, but may need modification if issues with sporadic presses are seen.
 #define apButton 0
 
 //BILL ACCEPTOR SETTINGS
-#define RXB 2   //define the GPIO connected TO the TX of the bill acceptor
-#define TXB 20  //define the GPIO connected TO the RX of the bill acceptor
+#define RXB 41   //define the GPIO connected TO the TX of the bill acceptor
+#define TXB 40  //define the GPIO connected TO the RX of the bill acceptor
 
 //COIN ACCEPTOR SETTINGS
-#define RXC 41         //define the GPIO connected TO the SIGNAL/TX of the coin acceptor
-#define INHIBITMECH 4  //define the GPIO connected TO the INHIBIT of the coin acceptor
+#define RXC 19         //define the GPIO connected TO the SIGNAL/TX of the coin acceptor
+#define INHIBITMECH 20  //define the GPIO connected TO the INHIBIT of the coin acceptor
 
 //THERMAL PRINTER SETTINGS
-#define RXP 42  //define the GPIO connected TO the TX of the thermal printer
-#define TXP 19  //define the GPIO connected TO the RX of the thermal printer
+#define RXP 1  //define the GPIO connected TO the TX of the thermal printer
+#define TXP 4  //define the GPIO connected TO the RX of the thermal printer
 
 //RELAY SETTINGS--
-#define RELAY_PIN 1
+#define RELAY_PIN 42
 
 //NFC PN532
 #define I2C_SDA 48
@@ -123,7 +123,7 @@ Joke jokes[] = {
 
 
 //GENERAL SETTINGS--
-String fwVersion = "2,0";  //set the version of the firmware release here.
+String fwVersion = "2.0";  //set the version of the firmware release here.
 String hwVersion = "2.0";  //set the version of the hardware release here.
 #define MAX_DATA_SIZE 854  // maximum allowed size of NFC data
 #define AW9523_ADDRESS 0x5B
@@ -140,10 +140,10 @@ String hwVersion = "2.0";  //set the version of the hardware release here.
 bool paymentVerified = false, paymentFailed = false, lowBalance = false, isBoltcard = false, nativeLang, dualLang, stealthMode, ledOn, liveRate, useGraffiti, acceptCoins, acceptNotes, coinOnly, enableWifi, enableNfc, atmMode, giftMode, thermalQR, screenQR, printQuotes, printJokes, triggerAp = false, backupReceipt, balanceCheck, wsDataReceived = false, pauseScanning = false;
 uint16_t colour1, colour2, colour3, colour4, colour5, background;
 uint8_t metadataHash[32];
-String lannN = "", lauN = "", porN = "", resN = "", staN = "", wakN = "", entN = "", buyN = "", bitN = "", herN = "", insN = "", exiN = "", lanN = "", feeN = "", totN = "", scaN = "", indN = "", recN = "", scaQRN = "", valN = "", dayN = "", daysN = "", enjN = "", errN = "", errQRN = "", CountdownN = "", timerExpN = "", walletN = "", conN = "", nfcdN = "", nfc1N = "", nfc2N = "", nfc3N = "", nfc4N = "", nfc5N = "", procN = "", recwalN = "", giftvN = "", lnaN = "", maxaN = "", walbalN = "", paidN = "", emailN = "";
+String lannN = "", lauN = "", porN = "", resN = "", staN = "", wakN = "", entN = "", buyN = "", bitN = "", herN = "", insN = "", exiN = "", lanN = "", feeN = "", totN = "", scaN = "", indN = "", recN = "", scaQRN = "", valN = "", dayN = "", daysN = "", enjN = "", errN = "", errQRN = "", CountdownN = "", timerExpN = "", walletN = "", conN = "", nfcdN = "", nfc1N = "", nfc2N = "", nfc3N = "", nfc4N = "", nfc5N = "", procN = "", recwalN = "", giftvN = "", lnaN = "", maxaN = "", walbalN = "", paidN = "";
 String lannE = "English", porE = "Access Point Launched.", resE = "Restart and launch Access Point to Configure", buyE = "BUY", bitE = "BITCOIN", herE = "HERE", insE = "Insert cash to buy Bitcoin", exiE = "Press button to finish", feeE = "Fee", lanE = "Press button to change language", totE = "Total", scaE = "Scan to receive sats.", walletE = "Funding wallet is low, please top-up and restart.";
 String indE = "Inserted", recE = "Please take your receipt.", scaQRE = "Scan this QR code with a lightning wallet to receive your sats!", valE = "This is valid for", dayE = "day only", daysE = "days only", enjE = "Enjoy your Sats!", errE = "Error Printing: Check Printer", errQRE = "QR Code will shortly be displayed on the screen.", CountdownE = "Time Remaining", timerExpE = "Timer expired! Printing instead.";
-String conE = "Please contact operator via", emailE = "contact@youremail.com", nfc1E = "NFC Disabled", nfc2E = "Press button to scan QR instead", nfc3E = "Failed, Please retry or scan QR.", nfc4E = "Please scan QR instead.", nfc5E = "Or tap NFC below.", procE = "Processing. Please Wait.", recwalE = "Recommended wallet", giftvE = "Gift Voucher", lnaE = "LNURL/LN Address or Bolt Card", maxaE = "Max Amount", paidE = "PAID", walbalE = "Wallet Balance";
+String conE = "Please contact operator via", nfc1E = "NFC Disabled", nfc2E = "Press button for QR", nfc3E = "Failed, retry or scan QR.", nfc4E = "Please scan QR instead.", nfc5E = "Or tap NFC below.", procE = "Processing. Please Wait.", recwalE = "Recommended wallet", giftvE = "Gift Voucher", lnaE = "LNURL/LN Address or Bolt Card", maxaE = "Max Amount", paidE = "PAID", walbalE = "Wallet Balance";
 String lann, por, res, ver, buy, bit, her, ins, exi, lan, fee, tot, sca, ind, rec, scaQR, val, day, days, enj, err, errQR, Countdown, timerExp, wallet, con, email, nfc1, nfc2, nfc3, nfc4, nfc5, proc, recwal, giftv, lna, maxa, paid, walbal, qrData, ssid, apPassword = "thebatatm", wifiPassword, lnurlATM, baseURLATM, secretATM, currencyATM = "", ntpServer, invoice, walletServer, walletID, coinValues, billValues, tz, url, lnurlp, adminKey, decodeUrl, metadata, domain, callback, hashString;
 String laddrUrl = "", lnurl = "", nfcData = "", receivedData = "", recWallet = "";
 int maxAmount, charge, bills, moneyTimer, converted, redemptionPd, timer = 0, screenW = 800, screenH = 480, maxReceipts;
@@ -1175,9 +1175,9 @@ HTTPClient http;
 
 
 Button BTNA(buttonPin, debounce, false, false);
-HardwareSerial SerialPort(2);        //Coin Acceptor
-Adafruit_Thermal printer(&Serial1);  //Thermal Printer
-HardwareSerial SerialPort2(0);       //Note Acceptor
+HardwareSerial cSerial(1);        //Coin Acceptor
+Adafruit_Thermal printer(&Serial);  //Thermal Printer
+HardwareSerial nSerial(2);       //Note Acceptor
 Adafruit_PN532 nfc(-1, -1, &Wire);   //NFC
 
 
@@ -1260,7 +1260,7 @@ void logo() {
 void transactionVerified() {
   gfx->fillScreen(BLACK);
   drawRGB565Image(800 / 2 - IMAGE_WIDTH2 / 2, 480 / 2 - IMAGE_HEIGHT2 / 2, check_bmp, IMAGE_WIDTH2, IMAGE_HEIGHT2);
-  printText(paid.c_str(), u8g2_font_helvB18_te, 5, GREEN, false, -1, -1);
+  printText(paid.c_str(), u8g2_font_maniac_tf, 4, ORANGE, false, -1, -1);
   delay(4000);
   gfx->fillScreen(background);
 }
@@ -1320,7 +1320,6 @@ void setLang(const JsonObject& obj) {
     timerExp = timerExpE;
     wallet = walletE;
     con = conE;
-    email = emailE;
     nfc1 = nfc1E;
     nfc2 = nfc2E;
     nfc3 = nfc3E;
@@ -1359,7 +1358,6 @@ void setLang(const JsonObject& obj) {
     timerExp = timerExpN;
     wallet = walletN;
     con = conN;
-    email = emailN;
     nfc1 = nfc1N;
     nfc2 = nfc2N;
     nfc3 = nfc3N;
@@ -1576,16 +1574,16 @@ bool checkForError() {
   // Transmit the real-time transmission status command for the specified status
   const byte transmitStatusCommand[] = { 0x10, 0x04, 0x01 };
   const byte clearData[] = { 0x1B, 0x40 };  // clear data in buffer
-  Serial1.write(transmitStatusCommand, sizeof(transmitStatusCommand));
+  Serial.write(transmitStatusCommand, sizeof(transmitStatusCommand));
 
   delay(50);
 
-  if (Serial1.available()) {
-    byte response = Serial1.read();
+  if (Serial.available()) {
+    byte response = Serial.read();
 
     if (response != 0x12) {
 
-      Serial1.write(clearData, sizeof(clearData));
+      Serial.write(clearData, sizeof(clearData));
       return true;
     }
   }
@@ -1621,9 +1619,9 @@ String wrapText(String input, int lineLength) {
 
 void printLogo() {
   const byte centerJustificationCommand[] = { 0x1B, 0x61, 0x01 };  // Set center justification
-  Serial1.write(centerJustificationCommand, sizeof(centerJustificationCommand));
+  Serial.write(centerJustificationCommand, sizeof(centerJustificationCommand));
   const byte printCommand[] = { 0x1C, 0x70, 0x01, 0x00 };  // FS p n m
-  Serial1.write(printCommand, sizeof(printCommand));
+  Serial.write(printCommand, sizeof(printCommand));
 }
 
 void getDatetime() {
@@ -1693,15 +1691,15 @@ void printQRcode(String qrData, byte size = 6, bool isMainQR = true) {
   const byte eccCommand[] = { 0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x33 };  // Error correction
   const byte printCommand[] = { 0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30 };
 
-  Serial1.write(modelCommand, sizeof(modelCommand));
-  Serial1.write(eccCommand, sizeof(eccCommand));
+  Serial.write(modelCommand, sizeof(modelCommand));
+  Serial.write(eccCommand, sizeof(eccCommand));
 
   int len = qrData.length() + 3;
   byte dataCommand[] = { 0x1D, 0x28, 0x6B, (byte)len, 0x00, 0x31, 0x50, 0x30 };
-  Serial1.write(dataCommand, sizeof(dataCommand));
-  Serial1.print(qrData);
+  Serial.write(dataCommand, sizeof(dataCommand));
+  Serial.print(qrData);
 
-  Serial1.write(printCommand, sizeof(printCommand));
+  Serial.write(printCommand, sizeof(printCommand));
 }
 
 
@@ -1732,7 +1730,7 @@ void printReceipt(String qrData) {
   printer.println("Lightning ATM");
   printer.boldOff();
 
-  printer.feed(1);
+  printer.feed(2);
   printer.setSize('S');
   printer.underlineOn();
 
@@ -1796,7 +1794,7 @@ void printReceipt(String qrData) {
   // Few line feeds for easy ripping off
   printer.feed(2);
   const byte reset[] = { 0x1B, 0x40 };
-  Serial1.write(reset, sizeof(reset));
+  Serial.write(reset, sizeof(reset));
 }
 
 void printVoucher(String qrData, String recWallet) {
@@ -1814,7 +1812,7 @@ void printVoucher(String qrData, String recWallet) {
   printer.boldOff();
 
   // Line space
-  printer.feed(1);
+  printer.feed(2);
   printer.setSize('S');
   printer.underlineOn();
 
@@ -1884,7 +1882,7 @@ void printVoucher(String qrData, String recWallet) {
   // Few line feeds for easy ripping off
   printer.feed(2);
   const byte reset[] = { 0x1B, 0x40 };
-  Serial1.write(reset, sizeof(reset));
+  Serial.write(reset, sizeof(reset));
 }
 
 /////////////////////////////////////////
@@ -2042,8 +2040,8 @@ void sendSats() {
 
   String requestData = "{\"description_hash\":\"" + String(hashString) + "\",";
   requestData += "\"callback\":\"" + String(callback) + "\",";
-  requestData += "\"amount\":" + String(millisatoshis) + ",";
-  //requestData += "\"amount\":1000,";  // - For testing 1 sat payments
+  //requestData += "\"amount\":" + String(millisatoshis) + ",";
+  requestData += "\"amount\":1000,";  // - For testing 1 sat payments
   requestData += "\"comment\":\"\",";
   requestData += "\"description\":\"ATM Withdrawal\"}";
 
@@ -2315,7 +2313,7 @@ void qrShowCodeLNURL() {
       printText(sca.c_str(), u8g2_font_helvB18_te, 1, colour4, false, 10, 35);
       printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
 
-      printText(nfc1.c_str(), u8g2_font_helvB18_te, 2, RED, false, 450, 360);
+      printText(nfc1.c_str(), u8g2_font_helvB18_te, 1, RED, false, 450, 360);
       printText("X", u8g2_font_helvB18_te, 5, RED, false, 550, 280);
     }
     if (screenQR && thermalQR && showingQRcode) {
@@ -2488,8 +2486,8 @@ void moneyTimerFun() {
         langChange = false;
       }
     }
-    if (SerialPort2.available()) {
-      int x = SerialPort2.read();
+    if (nSerial.available()) {
+      int x = nSerial.read();
       for (int i = 0; i < billAmountSize; i++) {
         if ((i + 1) == x) {
           bills = bills + billAmountInt[i];
@@ -2501,8 +2499,8 @@ void moneyTimerFun() {
         }
       }
     }
-    if (SerialPort.available()) {
-      int x = SerialPort.read();
+    if (cSerial.available()) {
+      int x = cSerial.read();
       for (int i = 0; i < coinAmountSize; i++) {
         if ((i + 1) == x) {
           coins = coins + coinAmountFloat[i];
@@ -2520,10 +2518,10 @@ void moneyTimerFun() {
     }
   }
 
-  total = (coins + bills) * 1000;
+  total = (coins + bills) * 100;
 
   // Turn off machines
-  SerialPort2.write(185);
+  nSerial.write(185);
   digitalWrite(INHIBITMECH, LOW);
 }
 
@@ -2705,7 +2703,7 @@ void loadConfig() {
   for (int i = 0; i < 2; i++) {
     File paramFile = FlashFS.open(files[i], "r");
     if (paramFile) {
-      DynamicJsonDocument doc(20000);  // important to set the correct size or data is not saved!
+      DynamicJsonDocument doc(30000);  // important to set the correct size or data is not saved!
       DeserializationError error = deserializeJson(doc, paramFile.readString());
       JsonArray root = doc.as<JsonArray>();
 
@@ -2921,35 +2919,35 @@ void loadConfig() {
         } else if (name == "countdown") {
           CountdownN = obj["value"].as<String>();
         } else if (name == "timerexp") {
-          timerExp = obj["value"].as<String>();
+          timerExpN = obj["value"].as<String>();
         } else if (name == "con") {
-          con = obj["value"].as<String>();
+          conN = obj["value"].as<String>();
         } else if (name == "email") {
           email = obj["value"].as<String>();
         } else if (name == "nfc1") {
-          nfc1 = obj["value"].as<String>();
+          nfc1N = obj["value"].as<String>();
         } else if (name == "nfc2") {
-          nfc2 = obj["value"].as<String>();
+          nfc2N = obj["value"].as<String>();
         } else if (name == "nfc3") {
-          nfc3 = obj["value"].as<String>();
+          nfc3N = obj["value"].as<String>();
         } else if (name == "nfc4") {
-          nfc4 = obj["value"].as<String>();
+          nfc4N = obj["value"].as<String>();
         } else if (name == "nfc5") {
-          nfc5 = obj["value"].as<String>();
+          nfc5N = obj["value"].as<String>();
         } else if (name == "proc") {
-          proc = obj["value"].as<String>();
+          procN = obj["value"].as<String>();
         } else if (name == "recwal") {
-          recwal = obj["value"].as<String>();
+          recwalN = obj["value"].as<String>();
         } else if (name == "giftv") {
-          giftv = obj["value"].as<String>();
+          giftvN = obj["value"].as<String>();
         } else if (name == "lna") {
-          lna = obj["value"].as<String>();
+          lnaN = obj["value"].as<String>();
         } else if (name == "maxa") {
-          maxa = obj["value"].as<String>();
+          maxaN = obj["value"].as<String>();
         } else if (name == "paid") {
-          paid = obj["value"].as<String>();
+          paidN = obj["value"].as<String>();
         } else if (name == "walbal") {
-          walbal = obj["value"].as<String>();
+          walbalN = obj["value"].as<String>();
         }
       }
     } else {
@@ -3135,9 +3133,9 @@ __AC_LINK__
 
   // Start and setup devices
   pinMode(INHIBITMECH, OUTPUT);
-  SerialPort.begin(4800, SERIAL_8N1, RXC);
-  Serial1.begin(19200, SERIAL_8N1, RXP, TXP);
-  SerialPort2.begin(300, SERIAL_8N2, RXB, TXB);
+  cSerial.begin(4800, SERIAL_8N1, RXC, -1);
+  Serial.begin(19200, SERIAL_8N1, RXP, TXP);
+  nSerial.begin(300, SERIAL_8N2, RXB, TXB);
   if (enableNfc) {
     Wire.begin(I2C_SDA, I2C_SCL, 40000);
     nfc.begin();
@@ -3146,7 +3144,7 @@ __AC_LINK__
   //check edition
   if (coinOnly) {
     digitalWrite(INHIBITMECH, HIGH);
-    SerialPort2.write(185);
+    nSerial.write(185);
     maxReceipts == 0;
     backupReceipt == false;
     ntpServer == "";
@@ -3188,9 +3186,9 @@ __AC_LINK__
     digitalWrite(INHIBITMECH, LOW);
   }
   if (acceptNotes) {
-    SerialPort2.write(184);
+    nSerial.write(184);
   } else {
-    SerialPort2.write(185);
+    nSerial.write(185);
   }
 }
 
@@ -3259,8 +3257,8 @@ void loop() {
     digitalWrite(INHIBITMECH, LOW);
   }
   if (acceptNotes) {
-    SerialPort2.write(184);
+    nSerial.write(184);
   } else {
-    SerialPort2.write(185);
+    nSerial.write(185);
   }
 }
