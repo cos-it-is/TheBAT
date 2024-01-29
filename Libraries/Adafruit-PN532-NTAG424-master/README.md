@@ -7,14 +7,6 @@ Check the additional methods prefixed with ntag424_.
 Also check ntag424_examples.ino in the examples folder.
 Tested with ESP32-D0WDQ6-V3 (TTGO T-Display) and Arduino 1.8.13.
 
-Additional libraries:
-In Arduino-ESP32 the mbedtls-cmac library has been excluded, and it is needed to sign the apdus.
-It is in the libraries/mbedtlscmac folder, copy the folder into your libraries folder.
-Its basically a copy of https://github.com/Mbed-TLS/mbedtls/blob/v2.16.7/include/mbedtls/cmac.h and https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v2.16.7/library/cmac.c
-
-
-
-
 # Adafruit-PN532
 
 

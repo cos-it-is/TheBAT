@@ -52,24 +52,24 @@ Arduino_RGB_Display* gfx = new Arduino_RGB_Display(
 bool format = false;  // true for formatting memory, use once, then make false and reflash
 
 //BUTTON SETTINGS
-#define buttonPin 2  //Set to GPIO for signal to button, only works on some GPIO. Don't change
-int debounce = 25;    //Set the debounce time (milliseconds) for the button, default should be 25, but may need modification if issues with sporadic presses are seen.
+#define buttonPin 1  //Set to GPIO for signal to button, only works on some GPIO. Don't change
+int debounce = 15;   //Set the debounce time (milliseconds) for the button, default should be 25, but may need modification if issues with sporadic presses are seen.
 #define apButton 0
 
 //BILL ACCEPTOR SETTINGS
-#define RXB 41   //define the GPIO connected TO the TX of the bill acceptor
+#define RXB 41  //define the GPIO connected TO the TX of the bill acceptor
 #define TXB 40  //define the GPIO connected TO the RX of the bill acceptor
 
 //COIN ACCEPTOR SETTINGS
-#define RXC 19         //define the GPIO connected TO the SIGNAL/TX of the coin acceptor
+#define RXC 19          //define the GPIO connected TO the SIGNAL/TX of the coin acceptor
 #define INHIBITMECH 20  //define the GPIO connected TO the INHIBIT of the coin acceptor
 
 //THERMAL PRINTER SETTINGS
-#define RXP 1  //define the GPIO connected TO the TX of the thermal printer
+#define RXP 42   //define the GPIO connected TO the TX of the thermal printer
 #define TXP 4  //define the GPIO connected TO the RX of the thermal printer
 
 //RELAY SETTINGS--
-#define RELAY_PIN 42
+#define RELAY_PIN 2
 
 //NFC PN532
 #define I2C_SDA 48
@@ -123,8 +123,8 @@ Joke jokes[] = {
 
 
 //GENERAL SETTINGS--
-String fwVersion = "2.0";  //set the version of the firmware release here.
-String hwVersion = "2.0";  //set the version of the hardware release here.
+String fwVersion = "2.1";  //set the version of the firmware release here.
+String hwVersion = "2.1";  //set the version of the hardware release here.
 #define MAX_DATA_SIZE 854  // maximum allowed size of NFC data
 #define AW9523_ADDRESS 0x5B
 
@@ -1175,10 +1175,10 @@ HTTPClient http;
 
 
 Button BTNA(buttonPin, debounce, false, false);
-HardwareSerial cSerial(1);        //Coin Acceptor
+HardwareSerial cSerial(1);          //Coin Acceptor
 Adafruit_Thermal printer(&Serial);  //Thermal Printer
-HardwareSerial nSerial(2);       //Note Acceptor
-Adafruit_PN532 nfc(-1, -1, &Wire);   //NFC
+HardwareSerial nSerial(2);          //Note Acceptor
+Adafruit_PN532 nfc(-1, -1, &Wire);  //NFC
 
 
 /////////////////////////////////////////
@@ -2040,8 +2040,8 @@ void sendSats() {
 
   String requestData = "{\"description_hash\":\"" + String(hashString) + "\",";
   requestData += "\"callback\":\"" + String(callback) + "\",";
-  //requestData += "\"amount\":" + String(millisatoshis) + ",";
-  requestData += "\"amount\":1000,";  // - For testing 1 sat payments
+  requestData += "\"amount\":" + String(millisatoshis) + ",";
+  //requestData += "\"amount\":1000,";  // - For testing 1 sat payments
   requestData += "\"comment\":\"\",";
   requestData += "\"description\":\"ATM Withdrawal\"}";
 
@@ -2076,7 +2076,7 @@ void NFCPayment() {
   if (success) {
     if (((uidLength == 7) || (uidLength == 4)) && (nfc.ntag424_isNTAG424())) {
       uint8_t data[256];
-      uint8_t bytesread = nfc.ntag424_ISOReadFile(data);
+      uint8_t bytesread = nfc.ntag424_ISOReadFile(data, sizeof(data));
 
       if (bytesread) {
         // Dump the page data

@@ -102,7 +102,7 @@ void loop(void) {
     if (((uidLength == 7) || (uidLength == 4)) && (nfc.ntag424_isNTAG424()))
     {
       uint8_t data[256];
-      uint8_t bytesread = nfc.ntag424_ISOReadFile(data);
+      uint8_t bytesread = nfc.ntag424_ISOReadFile(data, sizeof(data));
       
       // Display the current page number
       Serial.print("Response ");
@@ -110,10 +110,16 @@ void loop(void) {
       // Display the results, depending on 'success'
       if (bytesread)
       {
-        // Dump the page data
-        data[bytesread] = 0;
+        //0-terminate the buffer
+        if (bytesread < sizeof(data)){
+          data[bytesread] = 0;
+        }
+        else{
+          data[sizeof(data)-1] = 0;
+        }
         String lnurl = (char*)data;
-        Serial.println(lnurl);
+        // Dump the page data
+       Serial.println(lnurl);
         //nfc.PrintHexChar(data, bytesread);
       }
       else
