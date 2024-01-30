@@ -19,12 +19,13 @@ typedef WebServer WiFiWebServer;
 #include <stdlib.h>
 #include "time.h"
 #include "logo.h"  //logo images
-#include "Wire.h"
 #include <ctype.h>
 #include <WebSocketsClient.h>
 #include <Hash.h>
 #include "Adafruit_AW9523.h"
 #include <Adafruit_PN532_NTAG424.h>
+#include <PN532_I2C.h>
+#include <PN532.h>
 
 
 //========================================================//
@@ -53,7 +54,7 @@ bool format = false;  // true for formatting memory, use once, then make false a
 
 //BUTTON SETTINGS
 #define buttonPin 1  //Set to GPIO for signal to button, only works on some GPIO. Don't change
-int debounce = 15;   //Set the debounce time (milliseconds) for the button, default should be 25, but may need modification if issues with sporadic presses are seen.
+int debounce = 25;   //Set the debounce time (milliseconds) for the button, default should be 25, but may need modification if issues with sporadic presses are seen.
 #define apButton 0
 
 //BILL ACCEPTOR SETTINGS
@@ -65,8 +66,8 @@ int debounce = 15;   //Set the debounce time (milliseconds) for the button, defa
 #define INHIBITMECH 20  //define the GPIO connected TO the INHIBIT of the coin acceptor
 
 //THERMAL PRINTER SETTINGS
-#define RXP 42   //define the GPIO connected TO the TX of the thermal printer
-#define TXP 4  //define the GPIO connected TO the RX of the thermal printer
+#define RXP 42  //define the GPIO connected TO the TX of the thermal printer
+#define TXP 4   //define the GPIO connected TO the RX of the thermal printer
 
 //RELAY SETTINGS--
 #define RELAY_PIN 2
@@ -1175,11 +1176,12 @@ HTTPClient http;
 
 
 Button BTNA(buttonPin, debounce, false, false);
-HardwareSerial cSerial(1);          //Coin Acceptor
-Adafruit_Thermal printer(&Serial);  //Thermal Printer
-HardwareSerial nSerial(2);          //Note Acceptor
-Adafruit_PN532 nfc(-1, -1, &Wire);  //NFC
-
+HardwareSerial cSerial(1);              //Coin Acceptor
+Adafruit_Thermal printer(&Serial);      //Thermal Printer
+HardwareSerial nSerial(2);              //Note Acceptor
+Adafruit_PN532 nfcread(-1, -1, &Wire);  //NFC
+PN532_I2C pn532i2c(Wire);               //NFC Power setting
+PN532 nfcpower(pn532i2c);
 
 /////////////////////////////////////////
 //////////////USED FUNCTIONS/////////////
@@ -2041,7 +2043,7 @@ void sendSats() {
   String requestData = "{\"description_hash\":\"" + String(hashString) + "\",";
   requestData += "\"callback\":\"" + String(callback) + "\",";
   requestData += "\"amount\":" + String(millisatoshis) + ",";
-  //requestData += "\"amount\":1000,";  // - For testing 1 sat payments
+  //requestData += "\"amount\":1000,";  // - For testing 1 sat NFC payments, comment out when in production.
   requestData += "\"comment\":\"\",";
   requestData += "\"description\":\"ATM Withdrawal\"}";
 
@@ -2072,11 +2074,11 @@ void NFCPayment() {
   }
 
 
-  success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 200);
+  success = nfcread.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 200);
   if (success) {
-    if (((uidLength == 7) || (uidLength == 4)) && (nfc.ntag424_isNTAG424())) {
+    if (((uidLength == 7) || (uidLength == 4)) && (nfcread.ntag424_isNTAG424())) {
       uint8_t data[256];
-      uint8_t bytesread = nfc.ntag424_ISOReadFile(data, sizeof(data));
+      uint8_t bytesread = nfcread.ntag424_ISOReadFile(data, sizeof(data));
 
       if (bytesread) {
         // Dump the page data
@@ -2095,7 +2097,7 @@ void NFCPayment() {
       laddrData[0] = '\0';
 
       for (uint8_t page = 4; page < 229; page++) {
-        success = nfc.mifareultralight_ReadPage(page, data);
+        success = nfcread.mifareultralight_ReadPage(page, data);
         if (success) {
           // Concatenate the data from this page to both lnurlData and addrData
           strncat(lnurlData, reinterpret_cast<char*>(data), sizeof(data));
@@ -2447,7 +2449,7 @@ void qrShowCodeLNURL() {
         printText((String(con.c_str()) + " " + String(email.c_str())).c_str(), u8g2_font_helvB18_te, 1, RED, false, -1, -1);
         printText(exi.c_str(), u8g2_font_helvB18_te, 1, RED, false, 10, 470);
         delay(500);
-        if (BTNA.wasPressed()) {
+        if (BTNA.wasReleased()) {
           buttonPress = true;
         }
       }
@@ -2479,7 +2481,7 @@ void moneyTimerFun() {
       }
       feedmefiat();
       BTNA.read();
-      if (dualLang && BTNA.wasPressed() && total == 0) {
+      if (dualLang && BTNA.wasReleased() && total == 0) {
         nativeLang = !nativeLang;
         setLang(obj);
         gfx->fillScreen(background);
@@ -2610,6 +2612,23 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
   }
 }
 
+
+bool setRFPower(PN532_I2C* pn532i2c, int power) {
+  // Ensure power is within the valid range (0x00 to 0xFF)
+  if (power < 0) power = 0;
+  if (power > 255) power = 255;
+
+  // Create the command array
+  uint8_t command[] = { 0x32, 0x05, static_cast<uint8_t>(power) };
+
+  // Send the command to the PN532 and check if it was successful
+  int result = pn532i2c->writeCommand(command, sizeof(command));
+
+  String resultString = String(result);
+  printText(resultString.c_str(), u8g2_font_helvB18_te, 2, RED, false, -1, -1);
+  // Return true if the command was successful, false otherwise
+  return (result == 0);
+}
 
 
 /////////////////////////////////////////
@@ -3138,7 +3157,9 @@ __AC_LINK__
   nSerial.begin(300, SERIAL_8N2, RXB, TXB);
   if (enableNfc) {
     Wire.begin(I2C_SDA, I2C_SCL, 40000);
-    nfc.begin();
+    nfcread.begin();
+    nfcpower.begin();
+    setRFPower(&pn532i2c, 255);
   }
   setLang(obj);
   //check edition
