@@ -144,7 +144,7 @@ uint8_t metadataHash[32];
 String lannN = "", lauN = "", porN = "", resN = "", staN = "", wakN = "", entN = "", buyN = "", bitN = "", herN = "", insN = "", exiN = "", lanN = "", feeN = "", totN = "", scaN = "", indN = "", recN = "", scaQRN = "", valN = "", dayN = "", daysN = "", enjN = "", errN = "", errQRN = "", CountdownN = "", timerExpN = "", walletN = "", conN = "", nfcdN = "", nfc1N = "", nfc2N = "", nfc3N = "", nfc4N = "", nfc5N = "", procN = "", recwalN = "", giftvN = "", lnaN = "", maxaN = "", walbalN = "", paidN = "";
 String lannE = "English", porE = "Access Point Launched.", resE = "Restart and launch Access Point to Configure", buyE = "BUY", bitE = "BITCOIN", herE = "HERE", insE = "Insert cash to buy Bitcoin", exiE = "Press button to finish", feeE = "Fee", lanE = "Press button to change language", totE = "Total", scaE = "Scan to receive sats.", walletE = "Funding wallet is low, please top-up and restart.";
 String indE = "Inserted", recE = "Please take your receipt.", scaQRE = "Scan this QR code with a lightning wallet to receive your sats!", valE = "This is valid for", dayE = "day only", daysE = "days only", enjE = "Enjoy your Sats!", errE = "Error Printing: Check Printer", errQRE = "QR Code will shortly be displayed on the screen.", CountdownE = "Time Remaining", timerExpE = "Timer expired! Printing instead.";
-String conE = "Please contact operator via", nfc1E = "NFC Disabled", nfc2E = "Press button for QR", nfc3E = "Failed, retry or scan QR.", nfc4E = "Please scan QR instead.", nfc5E = "Or tap NFC below.", procE = "Processing. Please Wait.", recwalE = "Recommended wallet", giftvE = "Gift Voucher", lnaE = "LNURL/LN Address or Bolt Card", maxaE = "Max Amount", paidE = "PAID", walbalE = "Wallet Balance";
+String conE = "Please contact operator via", nfc1E = "NFC Disabled", nfc2E = "Press button for QR", nfc3E = "Failed, retry or scan QR.", nfc4E = "Please scan QR instead.", nfc5E = "Or tap NFC below.", procE = "Processing. Please Wait.", recwalE = "Recommended wallet", giftvE = "Gift Voucher", lnaE = "LNURL-LN Address or BoltCard", maxaE = "Max Amount", paidE = "PAID", walbalE = "Wallet Balance";
 String lann, por, res, ver, buy, bit, her, ins, exi, lan, fee, tot, sca, ind, rec, scaQR, val, day, days, enj, err, errQR, Countdown, timerExp, wallet, con, email, nfc1, nfc2, nfc3, nfc4, nfc5, proc, recwal, giftv, lna, maxa, paid, walbal, qrData, ssid, apPassword = "thebatatm", wifiPassword, lnurlATM, baseURLATM, secretATM, currencyATM = "", ntpServer, invoice, walletServer, walletID, coinValues, billValues, tz, url, lnurlp, adminKey, decodeUrl, metadata, domain, callback, hashString;
 String laddrUrl = "", lnurl = "", nfcData = "", receivedData = "", recWallet = "";
 int maxAmount, charge, bills, moneyTimer, converted, redemptionPd, timer = 0, screenW = 800, screenH = 480, maxReceipts;
@@ -1013,7 +1013,7 @@ static const char PAGE_LANGUAGE[] PROGMEM = R"(
   "type": "ACInput",
   "apply": "text",
   "value": "",
-  "placeholder": "Press button to scan QR instead",
+  "placeholder": "Press button for QR",
   "style": "width:90%;display:block;color:#484f59"
 },
 {
@@ -1069,7 +1069,7 @@ static const char PAGE_LANGUAGE[] PROGMEM = R"(
   "type": "ACInput",
   "apply": "text",
   "value": "",
-  "placeholder": "LNURL or LN Address",
+  "placeholder": "LNURL-LN Address or BoltCard",
   "style": "width:90%;display:block;color:#484f59"
 },
 {
@@ -2364,7 +2364,7 @@ void qrShowCodeLNURL() {
           gfx->fillRect(410, 440, 400, 50, WHITE);
           printText(sca.c_str(), u8g2_font_helvB18_te, 1, colour4, false, 10, 35);
           printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
-          printText(nfc1.c_str(), u8g2_font_helvB18_te, 2, RED, false, 450, 360);
+          printText(nfc1.c_str(), u8g2_font_helvB18_te, 1, RED, false, 450, 360);
           printText("X", u8g2_font_helvB18_te, 5, RED, false, 550, 280);
         }
         if (screenQR && thermalQR) {
@@ -2373,7 +2373,7 @@ void qrShowCodeLNURL() {
           gfx->fillRect(410, 440, 400, 50, WHITE);
           printText((String(sca.c_str()) + " " + String(rec.c_str())).c_str(), u8g2_font_helvB18_te, 1, colour4, false, 10, 35);
           printText(exi.c_str(), u8g2_font_helvB18_te, 1, colour5, false, 10, 470);
-          printText(nfc1.c_str(), u8g2_font_helvB18_te, 2, RED, false, 450, 360);
+          printText(nfc1.c_str(), u8g2_font_helvB18_te, 1, RED, false, 450, 360);
           printText("X", u8g2_font_helvB18_te, 5, RED, false, 550, 280);
         }
         // Draw QR code
