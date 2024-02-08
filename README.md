@@ -10,7 +10,7 @@ Join the support group here: https://t.me/BitcoinAutoTeller
 
 ====
 
-![](https://i.ibb.co/r4MHh2r/Photo-Room-20240103-000242.png)
+![](https://i.ibb.co/DCMhL9w/IMG-20240130-183251.jpg)
 
 The B.A.T, short for Bitcoin Auto Teller directly integrates with https://lnbits.com as a funding wallet. 
 It is the first highly functional Bitcoin Lightning ATM to incorporate NFC withdrawls that support LNURL, LN Address and [Boltcard](https://www.boltcard.org/ "Boltcard"). It has many features, including thermal printer, NFC withdrawl, and Over-The-Air (OTA) update capability, a large screen and enhanced user customisation options. The B.A.T is designed to sit in between a hobbyists dream and commercial environment.
@@ -67,7 +67,7 @@ NV10 Host Cable - needed to change currency datasets or custom options on the ac
 
 Coin Acceptor LED Surround such as [THIS](https://www.aliexpress.com/item/1005002995360644.html?channel=twinner  "THIS")
 
-PN532 NFC Board such as [THIS](https://www.amazon.co.uk/HiLetgo-PN532-Module-Communication-Android/dp/B01I1J17LC  "THIS")
+PN532 NFC Board (Set in I2C Mode using switches on board) such as [THIS](https://www.amazon.co.uk/HiLetgo-PN532-Module-Communication-Android/dp/B01I1J17LC  "THIS")
 
 ====
 
@@ -138,13 +138,31 @@ There are instructions in the manual and many youtube videos of this process ava
 
 • In the dropdown menu, select the options as shown in the image provided:
 
-![](https://i.ibb.co/tzXJSHV/settings.png)
+![](https://i.ibb.co/3RJ5Sw9/settings.png)
 
 Alternatively, use a buring tool and the .BIN file provided in releases to install the firmware.
 
 
 # How to build:
 • Connect the devices together as per the wiring diagram. You can use Dupont wires or for the board, you can use a 2x40 (40 pin) IDC connector to breakout the pins. This is a 2mm pitch (not common 2.54mm)
+
+| Terminal Pin | GPIO | Description     |
+|--------------|------|-----------------|
+| 26           | 40   | Note TXB        |
+| 27           | 4    | Printer TXP     |
+| 29           | 1    | Button          |
+| 23           | 20   | Coin Inhibit    |
+| 25           | 41   | Note RXB        |
+| 28           | 42   | Printer RXP     |
+| 24           | 19   | Coin RXC        |
+| 30           | 2    | Relay           |
+| 31           | 47   | NFC - SCL       |
+| 32           | 48   | NFC - SDA       |
+| 2            | N/A  | Relay 5v        |
+| 6            | N/A  | Relay GND       |
+| 3            | N/A  | Button 3v       |
+| 5            | N/A  | Button GND      |
+| 1            | N/A  | NFC 5v          |
 
 # How to use:
 
@@ -166,6 +184,7 @@ Network and wallet configuration, You can change several parameters:
 - Live rate API URL: Set an API endpoint for retrieving live rates. e.g., https://legend.lnbits.com/lnurlp/api/v1/rate/GBP.
 - Wallet endpoint URL: Set the endpoint URL for wallet actions. e.g., https://legend.lnbits.com/api/v1/wallet.
 - API Key: Input your API Key, such as 69f5a4afe7834ddsj3jd7dj4f44cd82.
+- Screen Brightness: Set to High, Medium or Low.
 
 
 ## Acceptor and Fiat Settings:
@@ -209,5 +228,4 @@ Network and wallet configuration, You can change several parameters:
 ## Updating Firmware:
 - The B.A.T device allows firmware updates via OTA using .BIN files. To apply a new firmware update, navigate to the Update section in the access point, and proceed to flash the new release of the firmware.
 
-![](https://i.ibb.co/bLwT21k/BULL.png)
 
